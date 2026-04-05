@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { adminApi, getStoredAgent } from '../../services/adminApi';
 import { useToast } from '../../components/Toast';
-import type { Agent } from '../../types/admin';
+import type { Agent, AgentActivity } from '../../types/admin';
+import StatusBadge from '../../components/StatusBadge';
 
 const inputCls = 'w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-olive-500/60 focus:ring-1 focus:ring-olive-500/30';
 
@@ -15,16 +17,34 @@ export default function AdminAgentsPage() {
   const [error,   setError]   = useState<string | null>(null);
 
   // Create form
-  const [name,     setName]     = useState('');
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm,  setConfirm]  = useState('');
-  const [role,     setRole]     = useState<'agent' | 'admin'>('agent');
+  const [name,  setName]  = useState('');
+  const [email, setEmail] = useState('');
+  const [role,  setRole]  = useState<'agent' | 'admin'>('agent');
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   // Form visibility
   const [formOpen, setFormOpen] = useState(false);
+
+  // Activity panel
+  const [activityAgent, setActivityAgent] = useState<AgentActivity | null>(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+
+  async function openActivity(id: string) {
+    setActivityLoading(true);
+    setActivityAgent(null);
+    try {
+      const res = await adminApi.getAgentActivity(id);
+      setActivityAgent(res.data);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to load activity', 'error');
+    } finally {
+      setActivityLoading(false);
+    }
+  }
+
+  // Resend invite
+  const [resending, setResending] = useState<string | null>(null);
 
   // Delete confirm
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -48,21 +68,29 @@ export default function AdminAgentsPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
-    if (password !== confirm) {
-      setFormError('Passwords do not match');
-      return;
-    }
     setCreating(true);
     try {
-      const res = await adminApi.createAgent({ name, email, password, role });
+      const res = await adminApi.createAgent({ name, email, role });
       setAgents((prev) => [...prev, res.data]);
-      setName(''); setEmail(''); setPassword(''); setConfirm(''); setRole('agent');
+      setName(''); setEmail(''); setRole('agent');
       setFormOpen(false);
-      toast('Agent created', 'success');
+      toast('Agent created — login code sent by email', 'success');
     } catch (e) {
       setFormError(e instanceof Error ? e.message : 'Failed to create agent');
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleResend(id: string) {
+    setResending(id);
+    try {
+      await adminApi.resendAgentInvite(id);
+      toast('Invite sent', 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to send invite', 'error');
+    } finally {
+      setResending(null);
     }
   }
 
@@ -121,7 +149,11 @@ export default function AdminAgentsPage() {
                     const isSelf = agent._id === currentAgent?._id;
                     const isAi   = agent.isAiAgent;
                     return (
-                      <tr key={agent._id} className="bg-zinc-900">
+                      <tr
+                        key={agent._id}
+                        className="group bg-zinc-900 cursor-pointer hover:bg-zinc-800/50 transition"
+                        onClick={() => void openActivity(agent._id)}
+                      >
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-3">
                             <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
@@ -137,6 +169,9 @@ export default function AdminAgentsPage() {
                                 {isSelf && <span className="ml-2 text-[10px] text-zinc-600">(you)</span>}
                               </p>
                               <p className="text-xs text-zinc-600">{agent.email}</p>
+                              <p className="mt-0.5 text-[10px] text-zinc-700 group-hover:text-olive-600 transition">
+                                View performance profile →
+                              </p>
                             </div>
                           </div>
                         </td>
@@ -155,9 +190,17 @@ export default function AdminAgentsPage() {
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3.5 text-right">
+                        <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                           {isAdmin && !isAi && !isSelf && (
-                            confirmDelete === agent._id ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => void handleResend(agent._id)}
+                                disabled={resending === agent._id}
+                                className="rounded border border-zinc-800 px-2.5 py-1 text-[10px] font-semibold text-zinc-600 transition hover:border-sky-500/30 hover:text-sky-400 disabled:opacity-40"
+                              >
+                                {resending === agent._id ? '…' : 'Resend invite'}
+                              </button>
+                            {confirmDelete === agent._id ? (
                               <div className="flex items-center justify-end gap-2">
                                 <span className="text-xs text-zinc-500">Remove?</span>
                                 <button
@@ -181,7 +224,8 @@ export default function AdminAgentsPage() {
                               >
                                 Remove
                               </button>
-                            )
+                            )}
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -242,27 +286,10 @@ export default function AdminAgentsPage() {
                       className={inputCls}
                     />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Password</label>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      minLength={8}
-                      placeholder="Min. 8 characters"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Confirm Password</label>
-                    <input
-                      type="password"
-                      value={confirm}
-                      onChange={(e) => setConfirm(e.target.value)}
-                      required
-                      className={inputCls}
-                    />
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2.5">
+                    <p className="text-[10px] text-zinc-600">
+                      A one-time login code will be generated and sent to the agent's email. They'll be prompted to set their own password on first login.
+                    </p>
                   </div>
                   <div>
                     <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Role</label>
@@ -288,6 +315,93 @@ export default function AdminAgentsPage() {
           </div>
         )}
       </div>
+
+      {/* Activity slide-over */}
+      {(activityLoading || activityAgent) && (
+        <>
+          <div
+            className="fixed inset-0 z-20 bg-black/50"
+            onClick={() => { setActivityAgent(null); setActivityLoading(false); }}
+          />
+          <div className="fixed inset-y-0 right-0 z-30 flex w-full max-w-md flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
+              <p className="text-sm font-semibold text-zinc-200">
+                {activityAgent ? activityAgent.agent.name : 'Loading…'}
+              </p>
+              <button
+                onClick={() => { setActivityAgent(null); setActivityLoading(false); }}
+                className="text-zinc-600 transition hover:text-zinc-300"
+              >
+                ✕
+              </button>
+            </div>
+
+            {activityLoading && (
+              <div className="flex flex-1 items-center justify-center">
+                <span className="text-sm text-zinc-600">Loading activity…</span>
+              </div>
+            )}
+
+            {activityAgent && (
+              <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                {/* Stats */}
+                <div className="grid grid-cols-4 gap-3">
+                  {[
+                    { label: 'Assigned', value: activityAgent.stats.assigned },
+                    { label: 'Resolved', value: activityAgent.stats.resolved },
+                    { label: 'Replies',  value: activityAgent.stats.replies  },
+                    { label: 'Notes',    value: activityAgent.stats.notes    },
+                  ].map((s) => (
+                    <div key={s.label} className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-3 text-center">
+                      <p className="text-lg font-bold text-zinc-100">{s.value}</p>
+                      <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-600">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Assigned tickets */}
+                <div>
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Assigned Tickets</p>
+                  {activityAgent.assignedTickets.length === 0 ? (
+                    <p className="text-xs text-zinc-600">No tickets assigned</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {activityAgent.assignedTickets.map((t) => (
+                        <Link
+                          key={t._id}
+                          to={`/admin/tickets/${t._id}`}
+                          onClick={() => setActivityAgent(null)}
+                          className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2.5 transition hover:border-zinc-700"
+                        >
+                          <span className="truncate text-xs text-zinc-300">{t.title}</span>
+                          <StatusBadge status={t.status} />
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Recent replies */}
+                <div>
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Recent Replies</p>
+                  {activityAgent.recentReplies.length === 0 ? (
+                    <p className="text-xs text-zinc-600">No replies yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {activityAgent.recentReplies.map((r, i) => (
+                        <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2.5">
+                          <p className="mb-1 text-[10px] text-zinc-500 truncate">{r.ticketTitle}</p>
+                          <p className="line-clamp-2 text-xs text-zinc-400">{r.body}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

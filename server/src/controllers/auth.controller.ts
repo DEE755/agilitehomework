@@ -33,7 +33,13 @@ export async function login(req: Request, res: Response): Promise<void> {
 
   res.json({
     token,
-    agent: { _id: String(user._id), name: user.name, email: user.email, role: user.role },
+    agent: {
+      _id:                String(user._id),
+      name:               user.name,
+      email:              user.email,
+      role:               user.role,
+      mustChangePassword: user.mustChangePassword ?? false,
+    },
   });
 }
 

@@ -15,7 +15,8 @@ const userSchema = new Schema<UserDocument>(
       enum: ['agent', 'admin'] satisfies AgentRole[],
       default: 'agent',
     },
-    isAiAgent:    { type: Boolean, default: false },
+    isAiAgent:          { type: Boolean, default: false },
+    mustChangePassword: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

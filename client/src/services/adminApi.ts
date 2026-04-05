@@ -3,10 +3,16 @@ import type {
   AdminTicket,
   PaginatedAdminTickets,
   Agent,
+  AgentActivity,
   AdminTicketFilters,
   AiTriageResult,
   AiSuggestReplyResult,
   AppSettings,
+  AdminProduct,
+  CustomerProfileResult,
+  RemarketingPitchResult,
+  CoachMessage,
+  AppNotification,
 } from '../types/admin';
 import type { InternalNote } from '../types/admin';
 import type { Reply, TicketStatus, TicketPriority } from '../types/ticket';
@@ -20,6 +26,7 @@ export interface StoredAgent {
   name: string;
   email: string;
   role: string;
+  mustChangePassword?: boolean;
 }
 
 export function getStoredAgent(): StoredAgent | null {
@@ -146,16 +153,32 @@ export const adminApi = {
     return req('/agents');
   },
 
-  createAgent(data: { name: string; email: string; password: string; role: 'agent' | 'admin' }): Promise<{ data: Agent }> {
+  createAgent(data: { name: string; email: string; role: 'agent' | 'admin' }): Promise<{ data: Agent }> {
     return req('/agents', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  changePassword(data: { currentPassword: string; newPassword: string }): Promise<{ data: { ok: boolean } }> {
+    return req('/profile/password', { method: 'PATCH', body: JSON.stringify(data) });
   },
 
   deleteAgent(id: string): Promise<{ data: { deleted: boolean } }> {
     return req(`/agents/${id}`, { method: 'DELETE' });
   },
 
+  resendAgentInvite(id: string): Promise<{ data: { sent: boolean } }> {
+    return req(`/agents/${id}/resend-invite`, { method: 'POST' });
+  },
+
+  getAgentActivity(id: string): Promise<{ data: AgentActivity }> {
+    return req(`/agents/${id}/activity`);
+  },
+
   tags(): Promise<{ data: string[] }> {
     return req('/tags');
+  },
+
+  products(): Promise<{ data: AdminProduct[] }> {
+    return req('/products');
   },
 
   settings: {
@@ -164,6 +187,18 @@ export const adminApi = {
     },
     update(patch: Partial<AppSettings>): Promise<{ data: AppSettings }> {
       return req('/settings', { method: 'PATCH', body: JSON.stringify(patch) });
+    },
+  },
+
+  notifications: {
+    list(): Promise<{ data: { notifications: AppNotification[]; unreadCount: number } }> {
+      return req('/notifications');
+    },
+    markRead(id: string): Promise<{ data: { ok: boolean } }> {
+      return req(`/notifications/${id}/read`, { method: 'PATCH' });
+    },
+    markAllRead(): Promise<{ data: { ok: boolean } }> {
+      return req('/notifications/read-all', { method: 'PATCH' });
     },
   },
 
@@ -186,6 +221,53 @@ export const adminApi = {
       summary?: string;
     }): Promise<{ data: AiSuggestReplyResult }> {
       return aiReq('/suggest-reply', input);
+    },
+
+    customerProfile(input: {
+      ticketId?: string;
+      subject: string;
+      message: string;
+      productTitle?: string;
+      conversationHistory?: string;
+    }): Promise<{ data: CustomerProfileResult }> {
+      return aiReq('/customer-profile', input);
+    },
+
+    remarket(input: {
+      subject: string;
+      message: string;
+      productTitle?: string;
+      customerArchetype?: string;
+      refundIntent?: string;
+      sentiment?: string;
+      targetProductId?: string;
+    }): Promise<{ data: RemarketingPitchResult }> {
+      return aiReq('/remarket', input);
+    },
+
+    coach(input: {
+      subject: string;
+      message: string;
+      productTitle?: string;
+      archetype?: string;
+      archetypeLabel?: string;
+      archetypeReason?: string;
+      refundIntent?: string;
+      refundIntentReason?: string;
+      churnRisk?: string;
+      sentiment?: string;
+      lifetimeValueSignal?: string;
+      recommendedApproach?: string;
+      aiSummary?: string | null;
+      aiPriority?: string | null;
+      aiSuggestedNextStep?: string | null;
+      aiTags?: string[];
+      intentionId: string;
+      intentionLabel: string;
+      intentionDescription: string;
+      history: CoachMessage[];
+    }): Promise<{ data: { reply: string } }> {
+      return aiReq('/coach', input);
     },
   },
 };

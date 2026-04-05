@@ -41,11 +41,29 @@ export interface AdminTicketSummary extends TicketSummary {
   aiPriority?: 'low' | 'medium' | 'high' | 'irrelevant' | null;
   aiTriagedAt?: string | null;
   aiAutoAssigned?: boolean;
+  product?: { _id: string; name: string; category: string; imageUrl?: string | null } | null;
+  // Customer Intelligence (populated when ticket has been analyzed)
+  mktArchetype?: string | null;
+  mktArchetypeLabel?: string | null;
+  mktRefundIntent?: string | null;
+  mktChurnRisk?: string | null;
+  mktSentiment?: string | null;
+  mktLifetimeValueSignal?: string | null;
+  mktProfiledAt?: string | null;
+}
+
+export interface AdminTicketProduct {
+  _id: string;
+  name: string;
+  category: string;
+  sku: string;
+  imageUrl?: string;
 }
 
 export interface AdminTicket extends Omit<Ticket, 'replies'> {
   replies: Reply[];
   assignedTo: Pick<Agent, '_id' | 'name' | 'email'> | null;
+  product?: AdminTicketProduct | null;
   internalNotes: InternalNote[];
   aiSummary?: string | null;
   aiPriority?: 'low' | 'medium' | 'high' | 'irrelevant' | null;
@@ -53,6 +71,17 @@ export interface AdminTicket extends Omit<Ticket, 'replies'> {
   aiTags?: string[];
   aiTriagedAt?: string | null;
   aiAutoAssigned?: boolean;
+  // Customer Intelligence (persisted)
+  mktArchetype?: string | null;
+  mktArchetypeLabel?: string | null;
+  mktArchetypeReason?: string | null;
+  mktRefundIntent?: string | null;
+  mktRefundIntentReason?: string | null;
+  mktChurnRisk?: string | null;
+  mktSentiment?: string | null;
+  mktLifetimeValueSignal?: string | null;
+  mktRecommendedApproach?: string | null;
+  mktProfiledAt?: string | null;
 }
 
 export interface PaginatedAdminTickets {
@@ -72,11 +101,91 @@ export interface AppSettings {
   autoReplyEnabled: boolean;
 }
 
+export interface AdminProduct {
+  _id: string;
+  name: string;
+  category: string;
+  sku: string;
+  description: string;
+  imageUrl?: string | null;
+}
+
+export type CustomerArchetype = 'early_adopter' | 'loyal_advocate' | 'price_sensitive' | 'casual_buyer' | 'frustrated_veteran';
+
+export interface CustomerProfileResult {
+  archetype: CustomerArchetype;
+  archetypeLabel: string;
+  archetypeReason: string;
+  refundIntent: 'low' | 'medium' | 'high';
+  refundIntentReason: string;
+  churnRisk: 'low' | 'medium' | 'high';
+  sentiment: 'positive' | 'neutral' | 'frustrated' | 'hostile';
+  lifetimeValueSignal: 'high' | 'medium' | 'low';
+  recommendedApproach: string;
+}
+
+export interface RemarketingPitchResult {
+  productSlug: string | null;
+  shouldPitch: boolean;
+  productId: string;
+  productName: string;
+  matchReason: string;
+  pitchLine: string;
+  appendedMessage: string;
+  imageUrl?: string | null;
+}
+
+export interface AgentActivityTicket {
+  _id: string;
+  title: string;
+  status: TicketStatus;
+  aiPriority?: string | null;
+  createdAt: string;
+}
+
+export interface AgentActivityReply {
+  ticketId: string;
+  ticketTitle: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface AgentActivityStats {
+  assigned: number;
+  resolved: number;
+  replies: number;
+  notes: number;
+}
+
+export interface AgentActivity {
+  agent: Agent;
+  stats: AgentActivityStats;
+  assignedTickets: AgentActivityTicket[];
+  recentReplies: AgentActivityReply[];
+}
+
+export interface CoachMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export type AdminTicketFilters = {
-  status?: TicketStatus | 'all';
+  status?: TicketStatus | 'all' | 'unresolved';
   priority?: TicketPriority | 'all';
   assignedTo?: string; // agentId | 'unassigned' | undefined
   tag?: string;
   page?: number;
   limit?: number;
 };
+
+export type NotificationType = 'ticket_assigned' | 'customer_replied';
+
+export interface AppNotification {
+  _id: string;
+  type: NotificationType;
+  ticketId: string;
+  ticketTitle: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+}

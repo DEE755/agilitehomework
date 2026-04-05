@@ -3,12 +3,15 @@ import { isValidObjectId } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { Ticket } from '../models/Ticket';
 import { User, AI_AGENT_EMAIL } from '../models/User';
+import { Product } from '../models/Product';
 import { getOrCreateSettings } from '../models/Setting';
 import { runAiAgentPipeline } from '../services/aiAgentService';
 import type { TicketStatus, TicketPriority } from '../types/ticket.types';
 import type { AgentRole } from '../types/auth.types';
-import { attachReadUrls } from '../services/storage';
-import { sendAgentWelcomeEmail } from '../services/emailService';
+import { attachReadUrls, getObjectUrl } from '../services/storage';
+import { sendAgentWelcomeEmail, sendAgentReplyEmail } from '../services/emailService';
+import { Notification } from '../models/Notification';
+import { notifyAssigned } from '../services/notificationService';
 
 function getActingAgent(req: Request) {
   return req.agent ?? {
@@ -52,15 +55,28 @@ export async function listAdminTickets(req: Request, res: Response): Promise<voi
   const limitNum = Math.min(100, Math.max(1, parseInt(String(limit), 10)));
   const skip     = (pageNum - 1) * limitNum;
 
-  const [tickets, total] = await Promise.all([
+  const [rawTickets, total] = await Promise.all([
     Ticket.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum)
       .select('-replies -internalNotes')
-      .populate('assignedTo', 'name email isAiAgent'),
+      .populate('assignedTo', 'name email isAiAgent')
+      .populate('product', 'name category imageKey')
+      .lean(),
     Ticket.countDocuments(filter),
   ]);
+
+  // Resolve product imageKeys to signed URLs in parallel
+  const tickets = await Promise.all(
+    rawTickets.map(async (t) => {
+      const product = t.product as { _id: unknown; name: string; category: string; imageKey?: string } | null | undefined;
+      if (!product?.imageKey) return t;
+      const imageUrl = await getObjectUrl(product.imageKey);
+      const { imageKey: _ik, ...productWithUrl } = product;
+      return { ...t, product: { ...productWithUrl, imageUrl: imageUrl ?? null } };
+    }),
+  );
 
   res.json({
     data: tickets,
@@ -73,10 +89,21 @@ export async function getAdminTicket(req: Request, res: Response): Promise<void>
   const { ticketId } = req.params;
   if (!isValidObjectId(ticketId)) { res.status(400).json({ error: 'Invalid ticket ID' }); return; }
 
-  const ticket = await Ticket.findById(ticketId).populate('assignedTo', 'name email');
+  const ticket = await Ticket.findById(ticketId)
+    .populate('assignedTo', 'name email')
+    .populate('product', 'name category sku imageKey');
   if (!ticket) { res.status(404).json({ error: 'Ticket not found' }); return; }
 
-  res.json({ data: await attachReadUrls(ticket.toObject()) });
+  const obj = ticket.toObject() as ReturnType<typeof ticket.toObject> & {
+    product?: { name: string; category: string; sku: string; imageKey?: string; imageUrl?: string } | null;
+  };
+
+  if (obj.product?.imageKey) {
+    obj.product.imageUrl = await getObjectUrl(obj.product.imageKey);
+    delete obj.product.imageKey;
+  }
+
+  res.json({ data: await attachReadUrls(obj) });
 }
 
 // PATCH /api/admin/tickets/:ticketId/priority
@@ -152,6 +179,13 @@ export async function assignTicket(req: Request, res: Response): Promise<void> {
   if (!ticket) { res.status(404).json({ error: 'Ticket not found' }); return; }
   res.json({ data: ticket });
 
+  // Notify the newly assigned agent (skip AI agent)
+  if (assignedAgent && !assignedAgent.isAiAgent) {
+    void notifyAssigned(assignedAgent._id, ticket._id, ticket.title).catch((err: unknown) => {
+      console.error('[assignTicket] notify failed:', err);
+    });
+  }
+
   // Fire AI pipeline when manually assigned to the AI agent — force=true means always reply
   if (assignedAgent?.isAiAgent) {
     void runAiAgentPipeline(String(ticket._id), true);
@@ -207,6 +241,9 @@ export async function agentReply(req: Request, res: Response): Promise<void> {
 
   const reply = ticket.replies[ticket.replies.length - 1];
   res.status(201).json({ data: reply });
+
+  void sendAgentReplyEmail(ticket.authorEmail, ticket.authorName, String(ticket._id), ticket.title, body.trim())
+    .catch((err: unknown) => console.error('[agentReply] reply email failed:', err));
 }
 
 // GET /api/admin/agents
@@ -217,14 +254,12 @@ export async function listAgents(req: Request, res: Response): Promise<void> {
 
 // POST /api/admin/agents  (admin only)
 export async function createAgent(req: Request, res: Response): Promise<void> {
-  const { name, email, password, role } = req.body as {
-    name?: string; email?: string; password?: string; role?: AgentRole;
+  const { name, email, role } = req.body as {
+    name?: string; email?: string; role?: AgentRole;
   };
 
-  if (!name?.trim())     { res.status(400).json({ error: '"name" is required' }); return; }
-  if (!email?.trim())    { res.status(400).json({ error: '"email" is required' }); return; }
-  if (!password)         { res.status(400).json({ error: '"password" is required' }); return; }
-  if (password.length < 8) { res.status(400).json({ error: 'Password must be at least 8 characters' }); return; }
+  if (!name?.trim())  { res.status(400).json({ error: '"name" is required' }); return; }
+  if (!email?.trim()) { res.status(400).json({ error: '"email" is required' }); return; }
 
   const validRoles: AgentRole[] = ['agent', 'admin'];
   const resolvedRole: AgentRole = role && validRoles.includes(role) ? role : 'agent';
@@ -232,15 +267,88 @@ export async function createAgent(req: Request, res: Response): Promise<void> {
   const existing = await User.findOne({ email: email.toLowerCase().trim() });
   if (existing) { res.status(409).json({ error: 'Email already in use' }); return; }
 
-  const passwordHash = await bcrypt.hash(password, 12);
-  const agent = await User.create({ name: name.trim(), email: email.toLowerCase().trim(), passwordHash, role: resolvedRole });
+  const { randomBytes } = await import('crypto');
+  const tempPassword = randomBytes(8).toString('hex'); // 16-char hex one-time code
+  const passwordHash = await bcrypt.hash(tempPassword, 12);
+  const agent = await User.create({
+    name: name.trim(),
+    email: email.toLowerCase().trim(),
+    passwordHash,
+    role: resolvedRole,
+    mustChangePassword: true,
+  });
 
-  const { passwordHash: _ph, ...safe } = agent.toObject() as typeof agent.toObject & { passwordHash: string };
+  const { passwordHash: _ph, ...safe } = agent.toObject() as unknown as { passwordHash: string; [key: string]: unknown };
   res.status(201).json({ data: safe });
 
   // Fire-and-forget — email failure must not break the creation response
-  void sendAgentWelcomeEmail(agent.email, agent.name, password).catch((err: Error) => {
+  void sendAgentWelcomeEmail(agent.email, agent.name, tempPassword).catch((err: Error) => {
     console.error(`Welcome email failed for ${agent.email}:`, err.message);
+  });
+}
+
+// GET /api/admin/agents/:agentId/activity
+export async function getAgentActivity(req: Request, res: Response): Promise<void> {
+  const { agentId } = req.params;
+  if (!isValidObjectId(agentId)) { res.status(400).json({ error: 'Invalid agent ID' }); return; }
+
+  const agent = await User.findById(agentId).select('-passwordHash').lean();
+  if (!agent) { res.status(404).json({ error: 'Agent not found' }); return; }
+
+  const [assignedTickets, repliesData, notesCount] = await Promise.all([
+    Ticket.find({ assignedTo: agentId })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select('title status aiPriority createdAt')
+      .lean(),
+
+    Ticket.aggregate([
+      { $match: { 'replies.authorEmail': agent.email, 'replies.isAgent': true } },
+      { $unwind: '$replies' },
+      { $match: { 'replies.authorEmail': agent.email, 'replies.isAgent': true } },
+      { $sort: { 'replies.createdAt': -1 } },
+      { $limit: 10 },
+      { $project: {
+        _id: 0,
+        ticketId: '$_id',
+        ticketTitle: '$title',
+        body: '$replies.body',
+        createdAt: '$replies.createdAt',
+      }},
+    ]),
+
+    Ticket.countDocuments({ 'internalNotes.authorId': agentId }),
+  ]);
+
+  const stats = {
+    assigned: await Ticket.countDocuments({ assignedTo: agentId }),
+    resolved: await Ticket.countDocuments({ assignedTo: agentId, status: 'resolved' }),
+    replies:  repliesData.length,
+    notes:    notesCount,
+  };
+
+  res.json({ data: { agent, stats, assignedTickets, recentReplies: repliesData } });
+}
+
+// POST /api/admin/agents/:agentId/resend-invite  (admin only)
+export async function resendAgentInvite(req: Request, res: Response): Promise<void> {
+  const { agentId } = req.params;
+  if (!isValidObjectId(agentId)) { res.status(400).json({ error: 'Invalid agent ID' }); return; }
+
+  const agent = await User.findById(agentId);
+  if (!agent) { res.status(404).json({ error: 'Agent not found' }); return; }
+  if (agent.isAiAgent) { res.status(400).json({ error: 'Cannot send invite to AI Agent' }); return; }
+
+  const { randomBytes } = await import('crypto');
+  const tempPassword = randomBytes(8).toString('hex'); // 16-char hex
+  agent.passwordHash = await bcrypt.hash(tempPassword, 12);
+  agent.mustChangePassword = true;
+  await agent.save();
+
+  res.json({ data: { sent: true } });
+
+  void sendAgentWelcomeEmail(agent.email, agent.name, tempPassword).catch((err: Error) => {
+    console.error(`Resend invite failed for ${agent.email}:`, err.message);
   });
 }
 
@@ -256,6 +364,24 @@ export async function deleteAgent(req: Request, res: Response): Promise<void> {
 
   await agent.deleteOne();
   res.json({ data: { deleted: true } });
+}
+
+// GET /api/admin/products
+export async function listAdminProducts(_req: Request, res: Response): Promise<void> {
+  const products = await Product.find({ isActive: true }).sort({ sortOrder: 1, name: 1 }).lean();
+
+  const data = await Promise.all(
+    products.map(async (p) => ({
+      _id:      String(p._id),
+      name:     p.name,
+      category: p.category,
+      sku:      p.sku,
+      description: p.description,
+      imageUrl: p.imageKey ? await getObjectUrl(p.imageKey) : null,
+    })),
+  );
+
+  res.json({ data });
 }
 
 // GET /api/admin/tags
@@ -281,4 +407,61 @@ export async function updateSettings(req: Request, res: Response): Promise<void>
   await settings.save();
 
   res.json({ data: { autoReplyEnabled: settings.autoReplyEnabled } });
+}
+
+// GET /api/admin/notifications  — returns unread + recent 50 for the acting agent
+export async function listNotifications(req: Request, res: Response): Promise<void> {
+  const agentId = req.agent?._id;
+  if (!agentId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+
+  const notifications = await Notification.find({ agentId })
+    .sort({ createdAt: -1 })
+    .limit(50)
+    .lean();
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  res.json({ data: { notifications, unreadCount } });
+}
+
+// PATCH /api/admin/notifications/:notificationId/read
+export async function markNotificationRead(req: Request, res: Response): Promise<void> {
+  const agentId = req.agent?._id;
+  const { notificationId } = req.params;
+
+  if (!agentId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  if (!isValidObjectId(notificationId)) { res.status(400).json({ error: 'Invalid ID' }); return; }
+
+  await Notification.findOneAndUpdate({ _id: notificationId, agentId }, { read: true });
+  res.json({ data: { ok: true } });
+}
+
+// PATCH /api/admin/notifications/read-all
+export async function markAllNotificationsRead(req: Request, res: Response): Promise<void> {
+  const agentId = req.agent?._id;
+  if (!agentId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+
+  await Notification.updateMany({ agentId, read: false }, { read: true });
+  res.json({ data: { ok: true } });
+}
+
+// PATCH /api/admin/profile/password
+export async function changePassword(req: Request, res: Response): Promise<void> {
+  const agentId = req.agent?._id;
+  if (!agentId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+
+  const { currentPassword, newPassword } = req.body as { currentPassword?: string; newPassword?: string };
+  if (!currentPassword) { res.status(400).json({ error: '"currentPassword" is required' }); return; }
+  if (!newPassword || newPassword.length < 8) { res.status(400).json({ error: '"newPassword" must be at least 8 characters' }); return; }
+
+  const user = await User.findById(agentId);
+  if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) { res.status(400).json({ error: 'Current password is incorrect' }); return; }
+
+  user.passwordHash = await bcrypt.hash(newPassword, 12);
+  user.mustChangePassword = false;
+  await user.save();
+
+  res.json({ data: { ok: true } });
 }

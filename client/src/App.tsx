@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import CreateTicketPage from './pages/CreateTicketPage';
 import ProductsPage from './pages/ProductsPage';
 import SupportSuccessPage from './pages/SupportSuccessPage';
+import TicketLookupPage from './pages/TicketLookupPage';
 
 // Admin layout + pages
 import AdminLayout from './components/admin/AdminLayout';
@@ -29,6 +30,7 @@ export default function App() {
             <Route index element={<Navigate to="/products" replace />} />
             <Route path="products" element={<ProductsPage />} />
             <Route path="support/new" element={<CreateTicketPage />} />
+            <Route path="support/lookup" element={<TicketLookupPage />} />
             <Route path="support/success/:ticketId" element={<SupportSuccessPage />} />
 
             {/* Legacy customer ticket routes */}

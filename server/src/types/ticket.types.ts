@@ -42,6 +42,17 @@ export interface ITicket {
   aiTags?: string[];
   aiTriagedAt?: Date | null;
   aiAutoAssigned?: boolean;
+  // Customer Intelligence
+  mktArchetype?: string | null;
+  mktArchetypeLabel?: string | null;
+  mktArchetypeReason?: string | null;
+  mktRefundIntent?: string | null;
+  mktRefundIntentReason?: string | null;
+  mktChurnRisk?: string | null;
+  mktSentiment?: string | null;
+  mktLifetimeValueSignal?: string | null;
+  mktRecommendedApproach?: string | null;
+  mktProfiledAt?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
 }

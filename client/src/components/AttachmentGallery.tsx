@@ -128,7 +128,7 @@ export default function AttachmentGallery({
           {title} ({attachments.length})
         </p>
         <div className="flex flex-wrap gap-2">
-          {attachments.map((attachment, i) => {
+          {attachments.map((attachment) => {
             const viewableIndex = viewable.findIndex((a) => a.key === attachment.key);
             return (
               <button

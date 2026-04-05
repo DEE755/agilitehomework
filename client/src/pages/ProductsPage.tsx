@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProducts } from '../hooks/useProducts';
 import type { Product } from '../types/product';
 
@@ -74,18 +74,120 @@ function ProductCardSkeleton() {
   );
 }
 
+// ─── Product Detail Modal ─────────────────────────────────────────────────────
+
+function ProductModal({ product, onClose, onGetHelp }: {
+  product: Product;
+  onClose: () => void;
+  onGetHelp: (p: Product) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [imgErrored, setImgErrored] = useState(false);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const storeUrl = `https://www.agilite.com/products/${product.slug}`;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={(e) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); }}
+    >
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div
+        ref={ref}
+        className="relative z-10 flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl"
+      >
+        {/* Image */}
+        <div className="relative h-64 w-full shrink-0 overflow-hidden bg-zinc-800 sm:h-80">
+          {product.imageUrl && !imgErrored ? (
+            <img
+              src={product.imageUrl}
+              alt={product.name}
+              onError={() => setImgErrored(true)}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className={`flex h-full w-full items-center justify-center bg-gradient-to-b ${placeholderBg(product.category)}`}>
+              <span className="text-5xl opacity-20 select-none">◈</span>
+            </div>
+          )}
+          {/* Category badge */}
+          <span className={`absolute bottom-3 left-3 rounded-full border px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wide backdrop-blur-sm ${categoryStyle(product.category)}`}>
+            {product.category}
+          </span>
+          {/* Close */}
+          <button
+            onClick={onClose}
+            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900/80 text-zinc-400 backdrop-blur-sm transition hover:text-zinc-100"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6">
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <h2 className="text-xl font-bold text-zinc-100">{product.name}</h2>
+            <span className="shrink-0 font-mono text-[10px] text-zinc-700 mt-1">{product.sku}</span>
+          </div>
+
+          <p className="text-sm leading-relaxed text-zinc-400">{product.description}</p>
+
+          {/* Actions */}
+          <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
+            <a
+              href={storeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.preventDefault()}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-5 py-2.5 text-sm font-semibold text-zinc-200 transition hover:border-zinc-600 hover:text-white cursor-not-allowed"
+              title="Store link — coming soon"
+            >
+              <span>🛒</span>
+              Buy on Website
+              <span className="ml-1 rounded-full border border-zinc-600 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-zinc-600">soon</span>
+            </a>
+            <button
+              onClick={() => { onClose(); onGetHelp(product); }}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-olive-500/40 bg-olive-500/15 px-5 py-2.5 text-sm font-semibold text-olive-400 transition hover:bg-olive-500/25"
+            >
+              Get Help →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const DESCRIPTION_LIMIT = 80;
 const PAGE_SIZE_OPTIONS = [8, 16, 24] as const;
 type PageSize = typeof PAGE_SIZE_OPTIONS[number] | 'all';
 
 export default function ProductsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { products, loading, error, reload } = useProducts();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
-  const [allExpanded, setAllExpanded] = useState(false);
   const [pageSize, setPageSize] = useState<PageSize>(8);
   const [page, setPage] = useState(1);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  // Auto-open modal when ?product=<slug> is present
+  useEffect(() => {
+    const slug = searchParams.get('product');
+    if (!slug || products.length === 0) return;
+    const match = products.find((p) => p.slug === slug);
+    if (match) setSelectedProduct(match);
+  }, [searchParams, products]);
 
   const categories = ['All', ...Array.from(new Set(products.map((p) => p.category)))];
 
@@ -208,12 +310,12 @@ export default function ProductsPage() {
           {paginated.map((product) => (
             <div
               key={product._id}
-              className="group flex flex-col rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden transition hover:border-zinc-700 hover:shadow-xl hover:shadow-black/30"
+              className="group flex flex-col rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden transition hover:border-zinc-700 hover:shadow-xl hover:shadow-black/30 cursor-pointer"
+              onClick={() => setSelectedProduct(product)}
             >
               {/* Image */}
               <div className="relative h-44 overflow-hidden bg-zinc-800">
                 <ProductImage product={product} />
-                {/* Category badge — overlaid bottom-left */}
                 <span className={`absolute bottom-2.5 left-2.5 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide backdrop-blur-sm ${categoryStyle(product.category)}`}>
                   {product.category}
                 </span>
@@ -224,21 +326,23 @@ export default function ProductsPage() {
                 <h2 className="text-sm font-bold text-zinc-100">{product.name}</h2>
                 <div className="mt-1.5 flex-1">
                   <p className="text-xs leading-relaxed text-zinc-500">
-                    {!allExpanded && product.description.length > DESCRIPTION_LIMIT
+                    {product.description.length > DESCRIPTION_LIMIT
                       ? product.description.slice(0, DESCRIPTION_LIMIT).trimEnd() + '…'
                       : product.description}
                   </p>
-                  {product.description.length > DESCRIPTION_LIMIT && (
-                    <button
-                      onClick={() => setAllExpanded((v) => !v)}
-                      className="mt-1 text-[10px] font-medium text-zinc-600 transition hover:text-zinc-400"
-                    >
-                      {allExpanded ? 'Show less' : 'Read more'}
-                    </button>
-                  )}
                 </div>
 
-                <div className="mt-4 flex items-center justify-end border-t border-zinc-800 pt-3">
+                <div className="mt-4 flex items-center justify-between gap-2 border-t border-zinc-800 pt-3" onClick={(e) => e.stopPropagation()}>
+                  <a
+                    href={`https://www.agilite.com/products/${product.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.preventDefault()}
+                    className="rounded border border-zinc-700 px-3 py-1 text-xs font-medium text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300 cursor-not-allowed"
+                    title="Store link — coming soon"
+                  >
+                    🛒 Buy
+                  </a>
                   <button
                     onClick={() => openTicket(product)}
                     className="rounded border border-olive-500/30 bg-olive-500/10 px-3 py-1 text-xs font-semibold text-olive-400 transition hover:bg-olive-500/20 hover:text-olive-300"
@@ -250,6 +354,15 @@ export default function ProductsPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Product detail modal */}
+      {selectedProduct && (
+        <ProductModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          onGetHelp={(p) => { setSelectedProduct(null); openTicket(p); }}
+        />
       )}
 
       {/* Pagination */}

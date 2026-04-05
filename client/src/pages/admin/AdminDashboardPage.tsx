@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../../services/adminApi';
 import type { AdminTicketSummary, AdminStats, Agent } from '../../types/admin';
@@ -27,6 +27,163 @@ function formatAge(iso: string) {
 type StatusFilter   = TicketStatus | 'all' | 'unresolved';
 type PriorityFilter = TicketPriority | 'all';
 
+export type SortKey =
+  | 'date'
+  | 'ai_priority'
+  | 'refund_risk'
+  | 'churn_risk'
+  | 'sentiment'
+  | 'lifetime_value'
+  | 'archetype';
+
+const SORT_OPTIONS: { key: SortKey; label: string; group: 'standard' | 'marketing' }[] = [
+  { key: 'date',          label: 'Date',                group: 'standard'  },
+  { key: 'ai_priority',   label: 'Priority',            group: 'standard'  },
+  { key: 'refund_risk',   label: 'Refund Risk',         group: 'marketing' },
+  { key: 'churn_risk',    label: 'Churn Risk',          group: 'marketing' },
+  { key: 'sentiment',     label: 'Customer Sentiment',  group: 'marketing' },
+  { key: 'lifetime_value',label: 'Lifetime Value',      group: 'marketing' },
+  { key: 'archetype',     label: 'Customer Archetype',  group: 'marketing' },
+];
+
+function ClassByDropdown({ value, onChange }: { value: SortKey; onChange: (k: SortKey) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const activeLabel = SORT_OPTIONS.find((o) => o.key === value)?.label ?? 'Date';
+  const standard  = SORT_OPTIONS.filter((o) => o.group === 'standard');
+  const marketing = SORT_OPTIONS.filter((o) => o.group === 'marketing');
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 transition hover:border-zinc-700 hover:text-zinc-300"
+      >
+        <span className="text-zinc-600">Sort by:</span>
+        <span className={`font-semibold ${marketing.some((o) => o.key === value) ? 'text-rose-400' : 'text-zinc-300'}`}>
+          {activeLabel}
+        </span>
+        <svg viewBox="0 0 12 12" fill="none" className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`}>
+          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-1 w-60 rounded-xl border border-zinc-800 bg-zinc-950 py-1.5 shadow-2xl">
+          {/* Standard group */}
+          <p className="px-4 pb-1 pt-1.5 text-[9px] font-semibold uppercase tracking-widest text-zinc-700">Standard</p>
+          {standard.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => { onChange(item.key); setOpen(false); }}
+              className={`flex w-full items-center gap-2.5 px-4 py-2 text-xs transition hover:bg-zinc-800 ${
+                value === item.key ? 'font-semibold text-olive-400' : 'text-zinc-400 hover:text-zinc-100'
+              }`}
+            >
+              {value === item.key && <span className="text-[8px]">●</span>}
+              {value !== item.key && <span className="text-[8px] opacity-0">●</span>}
+              {item.label}
+            </button>
+          ))}
+
+          <div className="mx-3 my-1.5 border-t border-zinc-800" />
+
+          {/* Marketing group */}
+          <p className="px-4 pb-1 pt-0.5 text-[9px] font-semibold uppercase tracking-widest text-rose-500/70">
+            Marketing Intelligence
+          </p>
+          {marketing.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => { onChange(item.key); setOpen(false); }}
+              className={`flex w-full items-center gap-2.5 px-4 py-2 text-xs transition hover:bg-zinc-800 ${
+                value === item.key ? 'font-semibold text-rose-400' : 'text-zinc-400 hover:text-zinc-100'
+              }`}
+            >
+              {value === item.key && <span className="text-rose-500 text-[8px]">●</span>}
+              {value !== item.key && <span className="text-[8px] opacity-0">●</span>}
+              {item.label}
+            </button>
+          ))}
+
+          {/* Footer hint */}
+          <div className="mx-3 my-1.5 border-t border-zinc-800" />
+          <p className="px-4 py-1.5 text-[9px] text-zinc-700">
+            Marketing sorts use AI Intelligence data. Unanalyzed tickets appear last.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Marketing intelligence badge shown in ticket rows when a mkt sort is active ──
+const RISK_COLOR: Record<string, string> = {
+  high:   'border-red-500/30 bg-red-500/10 text-red-400',
+  medium: 'border-amber-500/30 bg-amber-500/10 text-amber-400',
+  low:    'border-green-500/30 bg-green-500/10 text-green-400',
+};
+const SENTIMENT_COLOR: Record<string, string> = {
+  hostile:   'border-red-500/30 bg-red-500/10 text-red-400',
+  frustrated:'border-orange-500/30 bg-orange-500/10 text-orange-400',
+  neutral:   'border-zinc-700 bg-zinc-800 text-zinc-400',
+  positive:  'border-green-500/30 bg-green-500/10 text-green-400',
+};
+const LTV_COLOR: Record<string, string> = {
+  high:   'border-olive-500/30 bg-olive-500/10 text-olive-400',
+  medium: 'border-zinc-700 bg-zinc-800 text-zinc-400',
+  low:    'border-red-500/30 bg-red-500/10 text-red-400',
+};
+
+function MktBadge({ ticket, sortBy }: { ticket: AdminTicketSummary; sortBy: SortKey }) {
+  let label = '';
+  let cls = 'border-zinc-700 bg-zinc-800/60 text-zinc-600';
+
+  switch (sortBy) {
+    case 'refund_risk':
+      if (!ticket.mktRefundIntent) { label = 'Not analyzed'; break; }
+      label = `${ticket.mktRefundIntent.charAt(0).toUpperCase() + ticket.mktRefundIntent.slice(1)} refund risk`;
+      cls = RISK_COLOR[ticket.mktRefundIntent] ?? cls;
+      break;
+    case 'churn_risk':
+      if (!ticket.mktChurnRisk) { label = 'Not analyzed'; break; }
+      label = `${ticket.mktChurnRisk.charAt(0).toUpperCase() + ticket.mktChurnRisk.slice(1)} churn risk`;
+      cls = RISK_COLOR[ticket.mktChurnRisk] ?? cls;
+      break;
+    case 'sentiment':
+      if (!ticket.mktSentiment) { label = 'Not analyzed'; break; }
+      label = ticket.mktSentiment.charAt(0).toUpperCase() + ticket.mktSentiment.slice(1);
+      cls = SENTIMENT_COLOR[ticket.mktSentiment] ?? cls;
+      break;
+    case 'lifetime_value':
+      if (!ticket.mktLifetimeValueSignal) { label = 'Not analyzed'; break; }
+      label = `${ticket.mktLifetimeValueSignal.charAt(0).toUpperCase() + ticket.mktLifetimeValueSignal.slice(1)} LTV`;
+      cls = LTV_COLOR[ticket.mktLifetimeValueSignal] ?? cls;
+      break;
+    case 'archetype':
+      if (!ticket.mktArchetypeLabel) { label = 'Not analyzed'; break; }
+      label = ticket.mktArchetypeLabel;
+      cls = 'border-violet-500/30 bg-violet-500/10 text-violet-400';
+      break;
+  }
+
+  if (!label) return null;
+  return (
+    <span className={`mt-1 inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-semibold ${cls}`}>
+      {label}
+    </span>
+  );
+}
+
 const STATUS_OPTS: { label: string; value: StatusFilter }[] = [
   { label: 'All',         value: 'all'         },
   { label: 'Pending',     value: 'unresolved'  },
@@ -47,6 +204,7 @@ export default function AdminDashboardPage() {
   const [priority,   setPriority]   = useState<PriorityFilter>('all');
   const [assignedTo, setAssignedTo] = useState<string>('');
   const [activeTag,  setActiveTag]  = useState<string>('');
+  const [sortBy,     setSortBy]     = useState<SortKey>('date');
   const [page,       setPage]       = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total,      setTotal]      = useState(0);
@@ -78,6 +236,48 @@ export default function AdminDashboardPage() {
   useEffect(() => { void fetchData(); }, [fetchData]);
   useEffect(() => { setPage(1); }, [status, priority, assignedTo, activeTag]);
 
+
+  // Client-side sort (operates on the current page of results)
+  const RISK_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
+  const SENTIMENT_ORDER: Record<string, number> = { hostile: 0, frustrated: 1, neutral: 2, positive: 3 };
+  const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2, irrelevant: 3 };
+
+  const sortedTickets = [...tickets].sort((a, b) => {
+    const nullLast = (v: string | null | undefined) => v == null ? 1 : 0;
+    switch (sortBy) {
+      case 'refund_risk':
+        if (!a.mktRefundIntent && !b.mktRefundIntent) return 0;
+        if (!a.mktRefundIntent) return 1;
+        if (!b.mktRefundIntent) return -1;
+        return (RISK_ORDER[a.mktRefundIntent] ?? 9) - (RISK_ORDER[b.mktRefundIntent] ?? 9);
+      case 'churn_risk':
+        if (!a.mktChurnRisk && !b.mktChurnRisk) return 0;
+        if (!a.mktChurnRisk) return 1;
+        if (!b.mktChurnRisk) return -1;
+        return (RISK_ORDER[a.mktChurnRisk] ?? 9) - (RISK_ORDER[b.mktChurnRisk] ?? 9);
+      case 'sentiment':
+        if (!a.mktSentiment && !b.mktSentiment) return 0;
+        if (!a.mktSentiment) return 1;
+        if (!b.mktSentiment) return -1;
+        return (SENTIMENT_ORDER[a.mktSentiment] ?? 9) - (SENTIMENT_ORDER[b.mktSentiment] ?? 9);
+      case 'lifetime_value':
+        if (!a.mktLifetimeValueSignal && !b.mktLifetimeValueSignal) return 0;
+        if (!a.mktLifetimeValueSignal) return 1;
+        if (!b.mktLifetimeValueSignal) return -1;
+        // Lifetime value: high first (most valuable customers need attention)
+        return (RISK_ORDER[a.mktLifetimeValueSignal] ?? 9) - (RISK_ORDER[b.mktLifetimeValueSignal] ?? 9);
+      case 'archetype':
+        if (nullLast(a.mktArchetypeLabel) !== nullLast(b.mktArchetypeLabel))
+          return nullLast(a.mktArchetypeLabel) - nullLast(b.mktArchetypeLabel);
+        return (a.mktArchetypeLabel ?? '').localeCompare(b.mktArchetypeLabel ?? '');
+      case 'ai_priority':
+        return (PRIORITY_ORDER[a.aiPriority ?? ''] ?? 9) - (PRIORITY_ORDER[b.aiPriority ?? ''] ?? 9);
+      default: // 'date'
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    }
+  });
+
+  const isMarketingSort = ['refund_risk', 'churn_risk', 'sentiment', 'lifetime_value', 'archetype'].includes(sortBy);
 
   return (
     <div>
@@ -161,6 +361,8 @@ export default function AdminDashboardPage() {
             <option key={a._id} value={a._id}>{a.name}</option>
           ))}
         </select>
+
+        <ClassByDropdown value={sortBy} onChange={setSortBy} />
       </div>
 
       <div className="mb-5 h-px bg-zinc-800" />
@@ -197,7 +399,14 @@ export default function AdminDashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                  <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Ticket</th>
+                  <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+                    Ticket
+                    {isMarketingSort && (
+                      <span className="ml-2 rounded-full border border-rose-500/25 bg-rose-500/10 px-1.5 py-0.5 text-[8px] font-semibold text-rose-400">
+                        ↑ {SORT_OPTIONS.find((o) => o.key === sortBy)?.label}
+                      </span>
+                    )}
+                  </th>
                   <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Status</th>
                   <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Priority</th>
                   <th className="hidden px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-600 sm:table-cell">Assigned</th>
@@ -205,12 +414,34 @@ export default function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
-                {tickets.map((ticket) => (
+                {sortedTickets.map((ticket) => (
                   <tr key={ticket._id} className="group bg-zinc-900 transition hover:bg-zinc-800/60">
                     <td className="px-4 py-3.5">
-                      <Link to={`/admin/tickets/${ticket._id}`} className="block">
-                        <p className="font-medium text-zinc-200 group-hover:text-white line-clamp-1">{ticket.title}</p>
-                        <p className="mt-0.5 text-xs text-zinc-600">{ticket.authorName} · {ticket.authorEmail}</p>
+                      <Link to={`/admin/tickets/${ticket._id}`} className="flex items-center gap-3">
+                        {ticket.product?.imageUrl ? (
+                          <img
+                            src={ticket.product.imageUrl}
+                            alt={ticket.product.name}
+                            className="hidden h-9 w-9 shrink-0 rounded-md object-cover sm:block"
+                          />
+                        ) : ticket.product ? (
+                          <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-800/60 text-xs text-zinc-700 sm:flex">
+                            ☐
+                          </div>
+                        ) : null}
+                        <div className="min-w-0">
+                          <p className="font-medium text-zinc-200 group-hover:text-white line-clamp-1">{ticket.title}</p>
+                          {ticket.product ? (
+                            <p className="mt-0.5 truncate text-xs text-zinc-600">
+                              <span className="text-zinc-500">{ticket.product.name}</span>
+                              <span className="mx-1 text-zinc-700">·</span>
+                              <span>{ticket.authorName}</span>
+                            </p>
+                          ) : (
+                            <p className="mt-0.5 text-xs text-zinc-600">{ticket.authorName} · {ticket.authorEmail}</p>
+                          )}
+                          {isMarketingSort && <MktBadge ticket={ticket} sortBy={sortBy} />}
+                        </div>
                       </Link>
                     </td>
                     <td className="px-4 py-3.5"><StatusBadge status={ticket.status} /></td>

@@ -66,6 +66,17 @@ const ticketSchema = new Schema<TicketDocument>(
     aiTags:              { type: [String], default: [] },
     aiTriagedAt:         { type: Date, default: null },
     aiAutoAssigned:      { type: Boolean, default: false },
+    // Customer Intelligence fields — populated by POST /api/ai/customer-profile
+    mktArchetype:           { type: String, default: null },
+    mktArchetypeLabel:      { type: String, default: null },
+    mktArchetypeReason:     { type: String, default: null },
+    mktRefundIntent:        { type: String, default: null },
+    mktRefundIntentReason:  { type: String, default: null },
+    mktChurnRisk:           { type: String, default: null },
+    mktSentiment:           { type: String, default: null },
+    mktLifetimeValueSignal: { type: String, default: null },
+    mktRecommendedApproach: { type: String, default: null },
+    mktProfiledAt:          { type: Date,   default: null },
   },
   { timestamps: true },
 );

@@ -6,6 +6,8 @@ import { attachReadUrls, validateTicketAttachments } from '../services/storage';
 import { triageTicket } from '../services/aiService';
 import { getOrCreateSettings } from '../models/Setting';
 import { User, AI_AGENT_EMAIL } from '../models/User';
+import { notifyCustomerReplied } from '../services/notificationService';
+import { sendTicketConfirmationEmail } from '../services/emailService';
 
 // GET /api/tickets
 export async function listTickets(req: Request, res: Response): Promise<void> {
@@ -87,6 +89,9 @@ export async function createTicket(req: Request, res: Response): Promise<void> {
   }
 
   res.status(201).json({ data: ticket });
+
+  void sendTicketConfirmationEmail(ticket.authorEmail, ticket.authorName, String(ticket._id), ticket.title)
+    .catch((err: unknown) => console.error('[createTicket] confirmation email failed:', err));
 
   // Fire-and-forget AI triage (+ optional auto-reply) — runs after response is sent
   void (async () => {
@@ -191,6 +196,13 @@ export async function addReply(req: Request, res: Response): Promise<void> {
 
   const reply = ticket.replies[ticket.replies.length - 1];
   res.status(201).json({ data: reply });
+
+  // Notify the assigned agent that the customer replied (fire-and-forget)
+  if (ticket.assignedTo) {
+    void notifyCustomerReplied(ticket.assignedTo as import('mongoose').Types.ObjectId, ticket._id, ticket.title).catch(
+      (err: unknown) => console.error('[addReply] notify failed:', err),
+    );
+  }
 }
 
 // PATCH /api/tickets/:ticketId/close
@@ -213,4 +225,51 @@ export async function closeTicket(req: Request, res: Response): Promise<void> {
   await ticket.save();
 
   res.json({ data: ticket });
+}
+
+// GET /api/tickets/lookup?ticketId=...&email=...
+export async function lookupTicket(req: Request, res: Response): Promise<void> {
+  const { ticketId, email } = req.query;
+
+  if (!ticketId || typeof ticketId !== 'string' || !isValidObjectId(ticketId)) {
+    res.status(400).json({ error: 'Invalid or missing ticketId' });
+    return;
+  }
+
+  if (!email || typeof email !== 'string') {
+    res.status(400).json({ error: 'Missing email' });
+    return;
+  }
+
+  const ticket = await Ticket.findOne({
+    _id: ticketId,
+    authorEmail: email.toLowerCase().trim(),
+  }).populate('product', 'name category');
+
+  if (!ticket) {
+    res.status(404).json({ error: 'Ticket not found or email does not match' });
+    return;
+  }
+
+  const safeReplies = ticket.replies.map((r) => ({
+    body: r.body,
+    authorName: r.authorName,
+    isAgent: r.isAgent,
+    createdAt: (r as unknown as { createdAt?: Date }).createdAt,
+  }));
+
+  res.json({
+    data: {
+      _id: ticket._id,
+      title: ticket.title,
+      description: ticket.description,
+      status: ticket.status,
+      authorName: ticket.authorName,
+      authorEmail: ticket.authorEmail,
+      createdAt: ticket.createdAt,
+      updatedAt: ticket.updatedAt,
+      product: ticket.product,
+      replies: safeReplies,
+    },
+  });
 }

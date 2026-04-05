@@ -57,7 +57,22 @@ export default function SupportSuccessPage() {
           </div>
         )}
 
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+        {ticketId && state?.authorEmail && (
+          <div className="mt-6 rounded-xl border border-sky-500/20 bg-sky-500/5 p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-500">Track Progress</p>
+            <p className="mt-1 text-xs text-zinc-400">
+              Bookmark this link to follow your conversation at any time.
+            </p>
+            <Link
+              to={`/support/lookup?id=${ticketId}&email=${encodeURIComponent(state.authorEmail)}`}
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-sky-400 transition hover:text-sky-300"
+            >
+              View my ticket thread →
+            </Link>
+          </div>
+        )}
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
           <Link
             to="/products"
             className="rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-zinc-300 transition hover:border-zinc-700 hover:text-white"

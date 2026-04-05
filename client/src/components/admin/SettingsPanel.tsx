@@ -1,6 +1,79 @@
 import { useEffect, useState, useRef } from 'react';
 import { adminApi } from '../../services/adminApi';
 import type { AppSettings } from '../../types/admin';
+import { useToast } from '../Toast';
+
+const inputCls =
+  'w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-olive-500/60 focus:ring-1 focus:ring-olive-500/30';
+
+function ChangePasswordSection() {
+  const { toast } = useToast();
+  const [current,  setCurrent]  = useState('');
+  const [next,     setNext]     = useState('');
+  const [confirm,  setConfirm]  = useState('');
+  const [saving,   setSaving]   = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (next !== confirm) { setError('Passwords do not match'); return; }
+    if (next.length < 8)  { setError('Min. 8 characters required'); return; }
+    setSaving(true);
+    try {
+      await adminApi.changePassword({ currentPassword: current, newPassword: next });
+      setCurrent(''); setNext(''); setConfirm('');
+      toast('Password updated', 'success');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update password');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">Change Password</p>
+      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-2.5">
+        <input
+          type="password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          required
+          placeholder="Current password"
+          className={inputCls}
+        />
+        <input
+          type="password"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+          required
+          minLength={8}
+          placeholder="New password (min. 8 chars)"
+          className={inputCls}
+        />
+        <input
+          type="password"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          required
+          placeholder="Confirm new password"
+          className={inputCls}
+        />
+        {error && (
+          <p className="rounded border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">{error}</p>
+        )}
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full rounded border border-zinc-700 bg-zinc-800 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-300 transition hover:border-olive-500/40 hover:text-olive-400 disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : 'Update Password'}
+        </button>
+      </form>
+    </div>
+  );
+}
 
 interface Props {
   open: boolean;
@@ -129,6 +202,10 @@ export default function SettingsPanel({ open, onClose }: Props) {
                 />
               </div>
             </div>
+          </div>
+
+          <div className="border-t border-zinc-800/60 pt-6">
+            <ChangePasswordSection />
           </div>
         </div>
 

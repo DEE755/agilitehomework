@@ -5,6 +5,7 @@ import {
   createTicket,
   addReply,
   closeTicket,
+  lookupTicket,
 } from '../controllers/ticket.controller';
 import { validate } from '../middlewares/validate';
 
@@ -26,6 +27,7 @@ const createReplySchema = {
 };
 
 router.get('/', listTickets);
+router.get('/lookup', lookupTicket);
 router.get('/:ticketId', getTicket);
 router.post('/', validate(createTicketSchema), createTicket);
 router.post('/:ticketId/replies', validate(createReplySchema), addReply);

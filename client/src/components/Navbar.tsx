@@ -3,7 +3,6 @@ import { NavLink } from 'react-router-dom';
 
 const links = [
   { to: '/products', label: 'Products' },
-  { to: '/support/new', label: 'Contact Support' },
 ];
 
 export default function Navbar() {
@@ -45,8 +44,19 @@ export default function Navbar() {
           ))}
 
           <NavLink
+            to="/support/lookup"
+            className={({ isActive }) =>
+              `rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition ${
+                isActive ? 'text-olive-400' : 'text-zinc-500 hover:text-zinc-200'
+              }`
+            }
+          >
+            My Tickets
+          </NavLink>
+
+          <NavLink
             to="/support/new"
-            className="ml-3 rounded border border-olive-500/40 bg-olive-500/15 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-olive-400 transition hover:bg-olive-500/25 hover:text-olive-300"
+            className="ml-2 rounded border border-olive-500/40 bg-olive-500/15 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-olive-400 transition hover:bg-olive-500/25 hover:text-olive-300"
           >
             Open Ticket
           </NavLink>
@@ -90,9 +100,20 @@ export default function Navbar() {
               </NavLink>
             ))}
             <NavLink
+              to="/support/lookup"
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                `rounded px-3 py-2.5 text-sm font-medium transition ${
+                  isActive ? 'bg-zinc-900 text-olive-400' : 'text-zinc-400 hover:text-zinc-100'
+                }`
+              }
+            >
+              My Tickets
+            </NavLink>
+            <NavLink
               to="/support/new"
               onClick={() => setMobileOpen(false)}
-              className="mt-2 rounded border border-olive-500/40 bg-olive-500/15 px-3 py-2.5 text-center text-sm font-semibold text-olive-400"
+              className="mt-1 rounded border border-olive-500/40 bg-olive-500/15 px-3 py-2.5 text-center text-sm font-semibold text-olive-400"
             >
               Open Ticket
             </NavLink>

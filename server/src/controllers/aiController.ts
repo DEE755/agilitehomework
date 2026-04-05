@@ -1,7 +1,10 @@
 import type { Request, Response } from 'express';
 import { isValidObjectId } from 'mongoose';
-import { triageTicket, suggestReply, testConnection, customerAsk } from '../services/aiService';
+import { triageTicket, suggestReply, testConnection, customerAsk, analyzeCustomerProfile, generateRemarketingPitch, agentCoachChat } from '../services/aiService';
+import type { CoachMessage, CoachContext } from '../services/aiService';
 import { Ticket } from '../models/Ticket';
+import { Product } from '../models/Product';
+import { getObjectUrl } from '../services/storage';
 
 // POST /api/ai/triage-ticket
 export async function triageTicketHandler(req: Request, res: Response): Promise<void> {
@@ -104,6 +107,182 @@ export async function customerAskHandler(req: Request, res: Response): Promise<v
     res.json({ data: result });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'AI unavailable';
+    const status = msg.includes('not configured') ? 503 : 502;
+    res.status(status).json({ error: msg });
+  }
+}
+
+// POST /api/ai/customer-profile
+export async function customerProfileHandler(req: Request, res: Response): Promise<void> {
+  const { ticketId, subject, message, productTitle, conversationHistory } = req.body as {
+    ticketId?: unknown; subject?: unknown; message?: unknown;
+    productTitle?: unknown; conversationHistory?: unknown;
+  };
+
+  if (typeof subject !== 'string' || !subject.trim()) {
+    res.status(400).json({ error: '"subject" is required' }); return;
+  }
+  if (typeof message !== 'string' || !message.trim()) {
+    res.status(400).json({ error: '"message" is required' }); return;
+  }
+
+  try {
+    const result = await analyzeCustomerProfile({
+      subject:             subject.trim(),
+      message:             message.trim(),
+      productTitle:        typeof productTitle        === 'string' ? productTitle.trim()        : undefined,
+      conversationHistory: typeof conversationHistory === 'string' ? conversationHistory.trim() : undefined,
+    });
+
+    // Persist profile on ticket if ticketId provided
+    if (typeof ticketId === 'string' && isValidObjectId(ticketId)) {
+      await Ticket.findByIdAndUpdate(ticketId, {
+        $set: {
+          mktArchetype:           result.archetype,
+          mktArchetypeLabel:      result.archetypeLabel,
+          mktArchetypeReason:     result.archetypeReason,
+          mktRefundIntent:        result.refundIntent,
+          mktRefundIntentReason:  result.refundIntentReason,
+          mktChurnRisk:           result.churnRisk,
+          mktSentiment:           result.sentiment,
+          mktLifetimeValueSignal: result.lifetimeValueSignal,
+          mktRecommendedApproach: result.recommendedApproach,
+          mktProfiledAt:          new Date(),
+        },
+      });
+    }
+
+    res.json({ data: result });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Customer profile analysis failed';
+    const status = msg.includes('not configured') ? 503 : 502;
+    res.status(status).json({ error: msg });
+  }
+}
+
+// POST /api/ai/remarket
+export async function remarketHandler(req: Request, res: Response): Promise<void> {
+  const { subject, message, productTitle, customerArchetype, refundIntent, sentiment, targetProductId } = req.body as {
+    subject?: unknown; message?: unknown; productTitle?: unknown;
+    customerArchetype?: unknown; refundIntent?: unknown; sentiment?: unknown;
+    targetProductId?: unknown;
+  };
+
+  if (typeof subject !== 'string' || !subject.trim()) {
+    res.status(400).json({ error: '"subject" is required' }); return;
+  }
+  if (typeof message !== 'string' || !message.trim()) {
+    res.status(400).json({ error: '"message" is required' }); return;
+  }
+
+  try {
+    // Fetch active products as catalog
+    const products = await Product.find({ isActive: true }).select('_id slug name category description imageKey').lean();
+
+    // Resolve image URLs for the response (only if targeting a specific product)
+    const catalog = products.map((p) => ({
+      id:          String(p._id),
+      name:        p.name,
+      category:    p.category,
+      description: p.description,
+    }));
+
+    let targetProductName: string | undefined;
+    if (typeof targetProductId === 'string' && targetProductId) {
+      const found = products.find((p) => String(p._id) === targetProductId);
+      targetProductName = found?.name;
+    }
+
+    const result = await generateRemarketingPitch({
+      subject:           subject.trim(),
+      message:           message.trim(),
+      productTitle:      typeof productTitle      === 'string' ? productTitle.trim()      : undefined,
+      customerArchetype: typeof customerArchetype === 'string' ? customerArchetype        : undefined,
+      refundIntent:      typeof refundIntent      === 'string' ? refundIntent             : undefined,
+      sentiment:         typeof sentiment         === 'string' ? sentiment                : undefined,
+      catalog,
+      targetProductId:   typeof targetProductId === 'string' && targetProductId ? targetProductId : undefined,
+      targetProductName,
+    });
+
+    // Attach image URL + slug for the picked product
+    const pickedProduct = products.find((p) => String(p._id) === result.productId);
+    let imageUrl: string | null = null;
+    if (pickedProduct?.imageKey) {
+      imageUrl = await getObjectUrl(pickedProduct.imageKey) ?? null;
+    }
+    const productSlug: string | null = pickedProduct?.slug ?? null;
+
+    res.json({ data: { ...result, imageUrl, productSlug } });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Remarketing generation failed';
+    const status = msg.includes('not configured') ? 503 : 502;
+    res.status(status).json({ error: msg });
+  }
+}
+
+// POST /api/ai/coach
+export async function agentCoachHandler(req: Request, res: Response): Promise<void> {
+  const {
+    subject, message, productTitle,
+    archetype, archetypeLabel, refundIntent, churnRisk, sentiment, lifetimeValueSignal, recommendedApproach,
+    intentionId, intentionLabel, intentionDescription,
+    history,
+  } = req.body as {
+    subject?: unknown; message?: unknown; productTitle?: unknown;
+    archetype?: unknown; archetypeLabel?: unknown; refundIntent?: unknown;
+    churnRisk?: unknown; sentiment?: unknown; lifetimeValueSignal?: unknown;
+    recommendedApproach?: unknown;
+    intentionId?: unknown; intentionLabel?: unknown; intentionDescription?: unknown;
+    history?: unknown;
+  };
+
+  if (typeof subject !== 'string' || !subject.trim()) {
+    res.status(400).json({ error: '"subject" is required' }); return;
+  }
+  if (typeof message !== 'string' || !message.trim()) {
+    res.status(400).json({ error: '"message" is required' }); return;
+  }
+  if (typeof intentionId !== 'string' || !intentionId.trim()) {
+    res.status(400).json({ error: '"intentionId" is required' }); return;
+  }
+
+  // Validate and sanitize history
+  const safeHistory: CoachMessage[] = [];
+  if (Array.isArray(history)) {
+    for (const item of history as unknown[]) {
+      if (
+        item && typeof item === 'object' &&
+        'role' in item && 'content' in item &&
+        (item.role === 'user' || item.role === 'assistant') &&
+        typeof item.content === 'string'
+      ) {
+        safeHistory.push({ role: item.role as 'user' | 'assistant', content: item.content });
+      }
+    }
+  }
+
+  const ctx: CoachContext = {
+    subject:              subject.trim(),
+    message:              message.trim(),
+    productTitle:         typeof productTitle         === 'string' ? productTitle.trim()         : undefined,
+    archetype:            typeof archetype            === 'string' ? archetype                   : undefined,
+    archetypeLabel:       typeof archetypeLabel       === 'string' ? archetypeLabel              : undefined,
+    refundIntent:         typeof refundIntent         === 'string' ? refundIntent                : undefined,
+    churnRisk:            typeof churnRisk            === 'string' ? churnRisk                   : undefined,
+    sentiment:            typeof sentiment            === 'string' ? sentiment                   : undefined,
+    lifetimeValueSignal:  typeof lifetimeValueSignal  === 'string' ? lifetimeValueSignal         : undefined,
+    recommendedApproach:  typeof recommendedApproach  === 'string' ? recommendedApproach         : undefined,
+    intentionId:          intentionId.trim(),
+    intentionLabel:       typeof intentionLabel       === 'string' ? intentionLabel.trim()       : intentionId.trim(),
+    intentionDescription: typeof intentionDescription === 'string' ? intentionDescription.trim() : '',
+  };
+
+  try {
+    const reply = await agentCoachChat(ctx, safeHistory);
+    res.json({ data: { reply } });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Coach unavailable';
     const status = msg.includes('not configured') ? 503 : 502;
     res.status(status).json({ error: msg });
   }
