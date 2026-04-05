@@ -71,3 +71,4 @@ const ticketSchema = new Schema<TicketDocument>(
 );
 
 export const Ticket = model<TicketDocument>('Ticket', ticketSchema);
+
