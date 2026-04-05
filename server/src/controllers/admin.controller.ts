@@ -6,10 +6,11 @@ import { User, AI_AGENT_EMAIL } from '../models/User';
 import { Product } from '../models/Product';
 import { getOrCreateSettings } from '../models/Setting';
 import { runAiAgentPipeline } from '../services/aiAgentService';
+import { generateStoreInsights } from '../services/aiService';
 import type { TicketStatus, TicketPriority } from '../types/ticket.types';
 import type { AgentRole } from '../types/auth.types';
-import { attachReadUrls, getObjectUrl } from '../services/storage';
-import { sendAgentWelcomeEmail, sendAgentReplyEmail } from '../services/emailService';
+import { attachReadUrls, getObjectUrl, createAvatarUpload } from '../services/storage';
+import { sendAgentWelcomeEmail, sendAgentReplyEmail, sendInsightsReportEmail } from '../services/emailService';
 import { Notification } from '../models/Notification';
 import { notifyAssigned } from '../services/notificationService';
 
@@ -62,7 +63,7 @@ export async function listAdminTickets(req: Request, res: Response): Promise<voi
       .limit(limitNum)
       .select('-replies -internalNotes')
       .populate('assignedTo', 'name email isAiAgent')
-      .populate('product', 'name category imageKey')
+      .populate('product', 'name category slug price imageKey')
       .lean(),
     Ticket.countDocuments(filter),
   ]);
@@ -70,7 +71,7 @@ export async function listAdminTickets(req: Request, res: Response): Promise<voi
   // Resolve product imageKeys to signed URLs in parallel
   const tickets = await Promise.all(
     rawTickets.map(async (t) => {
-      const product = t.product as { _id: unknown; name: string; category: string; imageKey?: string } | null | undefined;
+      const product = t.product as { _id: unknown; name: string; category: string; price?: number; imageKey?: string } | null | undefined;
       if (!product?.imageKey) return t;
       const imageUrl = await getObjectUrl(product.imageKey);
       const { imageKey: _ik, ...productWithUrl } = product;
@@ -91,11 +92,11 @@ export async function getAdminTicket(req: Request, res: Response): Promise<void>
 
   const ticket = await Ticket.findById(ticketId)
     .populate('assignedTo', 'name email')
-    .populate('product', 'name category sku imageKey');
+    .populate('product', 'name category sku slug price imageKey');
   if (!ticket) { res.status(404).json({ error: 'Ticket not found' }); return; }
 
   const obj = ticket.toObject() as ReturnType<typeof ticket.toObject> & {
-    product?: { name: string; category: string; sku: string; imageKey?: string; imageUrl?: string } | null;
+    product?: { name: string; category: string; sku: string; price?: number; imageKey?: string; imageUrl?: string } | null;
   };
 
   if (obj.product?.imageKey) {
@@ -249,7 +250,13 @@ export async function agentReply(req: Request, res: Response): Promise<void> {
 // GET /api/admin/agents
 export async function listAgents(req: Request, res: Response): Promise<void> {
   const agents = await User.find().select('-passwordHash').sort({ isAiAgent: -1, name: 1 }).lean();
-  res.json({ data: agents });
+  const withAvatars = await Promise.all(
+    agents.map(async (a) => ({
+      ...a,
+      avatarUrl: a.avatarKey ? await getObjectUrl(a.avatarKey) : undefined,
+    })),
+  );
+  res.json({ data: withAvatars });
 }
 
 // POST /api/admin/agents  (admin only)
@@ -450,18 +457,159 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   if (!agentId) { res.status(401).json({ error: 'Unauthorized' }); return; }
 
   const { currentPassword, newPassword } = req.body as { currentPassword?: string; newPassword?: string };
-  if (!currentPassword) { res.status(400).json({ error: '"currentPassword" is required' }); return; }
   if (!newPassword || newPassword.length < 8) { res.status(400).json({ error: '"newPassword" must be at least 8 characters' }); return; }
 
   const user = await User.findById(agentId);
   if (!user) { res.status(404).json({ error: 'User not found' }); return; }
 
-  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
-  if (!valid) { res.status(400).json({ error: 'Current password is incorrect' }); return; }
+  // Skip current-password check when the admin forced a password reset
+  if (!user.mustChangePassword) {
+    if (!currentPassword) { res.status(400).json({ error: '"currentPassword" is required' }); return; }
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) { res.status(400).json({ error: 'Current password is incorrect' }); return; }
+  }
 
   user.passwordHash = await bcrypt.hash(newPassword, 12);
   user.mustChangePassword = false;
   await user.save();
 
   res.json({ data: { ok: true } });
+}
+
+// POST /api/admin/profile/avatar/presign
+export async function presignAvatarUpload(req: Request, res: Response): Promise<void> {
+  const agentId = req.agent?._id;
+  if (!agentId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  const { contentType } = req.body as { contentType?: string };
+  if (!contentType) { res.status(400).json({ error: '"contentType" is required' }); return; }
+  try {
+    const data = await createAvatarUpload(String(agentId), contentType);
+    res.json({ data });
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to presign' });
+  }
+}
+
+// ── In-memory cache for AI insights (30 min TTL) ──────────────────────────────
+interface InsightsCache {
+  data: Awaited<ReturnType<typeof generateStoreInsights>>;
+  generatedAt: string;
+  expiresAt: number;
+}
+let insightsCache: InsightsCache | null = null;
+const INSIGHTS_CACHE_TTL_MS = 30 * 60 * 1000;
+
+// GET /api/admin/ai-insights
+export async function getAiInsights(req: Request, res: Response): Promise<void> {
+  const force = req.query.refresh === 'true';
+  // Serve from cache if still fresh
+  if (!force && insightsCache && insightsCache.expiresAt > Date.now()) {
+    res.json({ data: insightsCache.data, generatedAt: insightsCache.generatedAt, cached: true });
+    return;
+  }
+
+  // Pull all tickets with AI + marketing data (lean, no body text)
+  const tickets = await Ticket.find()
+    .select('status aiPriority aiSummary aiTags mktSentiment mktArchetype mktArchetypeLabel mktRefundIntent mktChurnRisk mktLifetimeValueSignal mktProfiledAt aiTriagedAt')
+    .populate('product', 'name category')
+    .lean();
+
+  const total      = tickets.length;
+  const resolved   = tickets.filter((t) => t.status === 'resolved').length;
+  const open       = total - resolved;
+  const unanalyzed = tickets.filter((t) => !t.aiTriagedAt).length;
+
+  function countBy<T>(arr: T[], key: keyof T): Record<string, number> {
+    return arr.reduce((acc, item) => {
+      const v = String(item[key] ?? 'unknown');
+      acc[v] = (acc[v] ?? 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  }
+
+  const analyzed = tickets.filter((t) => t.aiTriagedAt);
+
+  const priorityBreakdown  = countBy(analyzed, 'aiPriority' as keyof typeof analyzed[0]);
+  const sentimentBreakdown = countBy(tickets.filter((t) => t.mktSentiment), 'mktSentiment' as keyof typeof tickets[0]);
+  const archetypeBreakdown = countBy(tickets.filter((t) => t.mktArchetypeLabel), 'mktArchetypeLabel' as keyof typeof tickets[0]);
+  const refundBreakdown    = countBy(tickets.filter((t) => t.mktRefundIntent), 'mktRefundIntent' as keyof typeof tickets[0]);
+  const churnBreakdown     = countBy(tickets.filter((t) => t.mktChurnRisk), 'mktChurnRisk' as keyof typeof tickets[0]);
+  const ltvBreakdown       = countBy(tickets.filter((t) => t.mktLifetimeValueSignal), 'mktLifetimeValueSignal' as keyof typeof tickets[0]);
+
+  // Top tags
+  const tagCount: Record<string, number> = {};
+  for (const t of analyzed) {
+    for (const tag of (t.aiTags ?? [])) { tagCount[tag] = (tagCount[tag] ?? 0) + 1; }
+  }
+  const topTags = Object.entries(tagCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([tag, count]) => ({ tag, count }));
+
+  // Top products by ticket count
+  const productCount: Record<string, number> = {};
+  for (const t of tickets) {
+    const prod = t.product as { name?: string } | null;
+    if (prod?.name) { productCount[prod.name] = (productCount[prod.name] ?? 0) + 1; }
+  }
+  const topProducts = Object.entries(productCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name, count]) => ({ name, count }));
+
+  // Recent summaries (last 20 analyzed)
+  const recentSummaries = analyzed
+    .filter((t) => t.aiSummary)
+    .sort((a, b) => new Date(b.aiTriagedAt as Date).getTime() - new Date(a.aiTriagedAt as Date).getTime())
+    .slice(0, 20)
+    .map((t) => t.aiSummary as string);
+
+  try {
+    const insights = await generateStoreInsights({
+      totalTickets: total,
+      openTickets: open,
+      resolvedTickets: resolved,
+      priorityBreakdown,
+      sentimentBreakdown,
+      archetypeBreakdown,
+      refundIntentBreakdown: refundBreakdown,
+      churnRiskBreakdown:    churnBreakdown,
+      ltvBreakdown,
+      topTags,
+      topProducts,
+      recentSummaries,
+      unanalyzedCount: unanalyzed,
+    });
+    const generatedAt = new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+    insightsCache = { data: insights, generatedAt, expiresAt: Date.now() + INSIGHTS_CACHE_TTL_MS };
+    res.json({ data: insights, generatedAt, cached: false });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to generate insights' });
+  }
+}
+
+// POST /api/admin/ai-insights/email
+export async function emailAiInsights(req: Request, res: Response): Promise<void> {
+  if (!insightsCache) { res.status(400).json({ error: 'No insights generated yet — open AI Insights first' }); return; }
+  const agent = req.agent;
+  if (!agent) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  try {
+    await sendInsightsReportEmail(agent.email, agent.name, insightsCache.data, insightsCache.generatedAt);
+    res.json({ data: { sent: true } });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to send email' });
+  }
+}
+
+// PATCH /api/admin/profile
+export async function updateProfile(req: Request, res: Response): Promise<void> {
+  const agentId = req.agent?._id;
+  if (!agentId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  const { avatarKey } = req.body as { avatarKey?: string };
+  const user = await User.findById(agentId);
+  if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+  if (avatarKey !== undefined) user.avatarKey = avatarKey;
+  await user.save();
+  const avatarUrl = user.avatarKey ? await getObjectUrl(user.avatarKey) : undefined;
+  res.json({ data: { avatarUrl } });
 }

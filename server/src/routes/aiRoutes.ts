@@ -8,12 +8,14 @@ import {
   customerProfileHandler,
   remarketHandler,
   agentCoachHandler,
+  productFinderHandler,
 } from '../controllers/aiController';
 
 const router = Router();
 
 // Public — no auth required
-router.post('/ask', customerAskHandler);
+router.post('/ask',    customerAskHandler);
+router.post('/finder', productFinderHandler);
 
 // All routes below require a logged-in agent
 router.use(requireAuth);

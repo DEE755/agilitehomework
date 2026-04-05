@@ -1,3 +1,5 @@
+import type { StoreInsightsResult } from './aiService';
+
 const BASE_URL = (process.env.MAILGUN_BASE_URL ?? 'https://api.mailgun.net/v3').replace(/\/$/, '');
 const DOMAIN   = process.env.MAILGUN_DOMAIN ?? '';
 const API_KEY  = process.env.MAILGUN_API_KEY ?? '';
@@ -102,4 +104,40 @@ export async function sendAgentWelcomeEmail(
   ].join('\n');
 
   await sendMailgunMessage(toEmail, subject, text);
+}
+
+export async function sendInsightsReportEmail(toEmail: string, toName: string, insights: StoreInsightsResult, generatedAt: string): Promise<void> {
+  const URGENCY_ICON: Record<string, string> = { high: '🔴', medium: '🟡', low: '🟢' };
+  const MAG_ICON: Record<string, string>     = { high: '🔴', medium: '🟡', low: '🟢' };
+
+  const lines = [
+    `AI Store Insights Report — ${generatedAt}`,
+    `Generated for: ${toName} <${toEmail}>`,
+    '',
+    `═══════════════════════════════════════`,
+    `STORE HEALTH SCORE: ${insights.storeHealthScore.toFixed(1)} / 10`,
+    `═══════════════════════════════════════`,
+    '',
+    insights.executiveSummary,
+    '',
+    '─── PRIORITY ACTIONS ───────────────────',
+    ...insights.priorityActions.map((a) => `${a.rank}. ${a.action}\n   Why: ${a.rationale}`),
+    '',
+    '─── TOP ISSUES ─────────────────────────',
+    ...insights.topIssues.map((i) => `${URGENCY_ICON[i.urgency] ?? '◈'} ${i.issue}\n   → ${i.recommendation}`),
+    '',
+    '─── CUSTOMER INTELLIGENCE ──────────────',
+    ...insights.customerIntel.map((c) => `• ${c.insight}\n  Action: ${c.action}`),
+    '',
+    '─── REVENUE RISKS ───────────────────────',
+    ...insights.revenueRisks.map((r) => `${MAG_ICON[r.magnitude] ?? '◈'} ${r.risk}\n   Mitigation: ${r.mitigation}`),
+    '',
+    '─── OPPORTUNITIES ───────────────────────',
+    ...insights.opportunities.map((o) => `✦ ${o.opportunity}\n  Impact: ${o.potentialImpact}`),
+    '',
+    '─────────────────────────────────────────',
+    'Powered by Agilite AI · Support Workspace',
+  ];
+
+  await sendMailgunMessage(toEmail, `Store AI Insights Report — ${generatedAt}`, lines.join('\n'));
 }

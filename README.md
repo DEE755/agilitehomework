@@ -1,6 +1,6 @@
 # ProjectAgilite — Support Portal
 
-A full-stack customer support ticketing platform built for a tactical gear brand. Customers can browse products, open support tickets, reply to threads, and track resolution status through a polished dark UI.
+A full-stack customer support platform built for a premium tactical gear brand. Agents work a priority ticket queue through a dark internal workspace. Customers open tickets through a separate customer portal. An AI layer handles triage, auto-replies, customer profiling, and cross-sell recommendations.
 
 ---
 
@@ -12,43 +12,53 @@ A full-stack customer support ticketing platform built for a tactical gear brand
 4. [Local Setup](#local-setup)
 5. [Environment Variables](#environment-variables)
 6. [Admin & Agents](#admin--agents)
-7. [Security](#security)
-8. [MongoDB Atlas Setup](#mongodb-atlas-setup)
-9. [Render Deployment](#render-deployment)
-10. [API Reference](#api-reference)
-11. [Scripts](#scripts)
+7. [AI Integration](#ai-integration)
+8. [Marketing Tools](#marketing-tools)
+9. [Security](#security)
+10. [MongoDB Atlas Setup](#mongodb-atlas-setup)
+11. [Render Deployment](#render-deployment)
+12. [API Reference](#api-reference)
+13. [Scripts](#scripts)
 
 ---
 
 ## Overview
 
-**ProjectAgilite** is a monorepo containing:
+**ProjectAgilite** is a monorepo with two separate apps sharing one API:
 
-- A **React + Vite** frontend with a dark tactical design system (olive / sand / graphite palette)
-- An **Express + TypeScript** REST API with request validation and structured error handling
-- A **MongoDB Atlas** database via Mongoose with an embedded reply sub-document model
+- A **customer portal** — browse products, open tickets, reply to threads, track status
+- An **agent workspace** (`/admin`) — priority queue, ticket management, AI tools, agent management
 
 Key features:
 
-- Browse a product catalog and open pre-filled support tickets
-- Searchable product picker modal
-- Ticket dashboard with status and priority filtering, pagination, and skeleton loading
-- Full ticket thread view with timestamped replies and avatar initials
-- Close ticket action with conflict guards (no replies on closed tickets)
-- Toast notifications for all async actions
+- Ticket queue with status (`new` / `in_progress` / `resolved`), priority, agent, and tag filters
+- Full conversation thread with internal notes (agent-only) and customer replies
+- Human-editable priority (High / Medium / Low / Irrelevant) alongside AI triage
+- AI auto-triage on ticket creation — summary, priority, tags, suggested next step
+- AI-suggested replies with auto-send eligibility scoring
+- AI Agent account that auto-replies when assigned, with typing indicator and live polling
+- **Customer Intelligence** — AI profiles each customer (archetype, refund/churn risk, sentiment, LTV signal)
+- **Product Remarketing** — AI picks a cross-sell product + generates a pitch; manual product selection also supported
+- Product catalog linked to tickets (R2-hosted images with signed URLs)
+- Agent management with role-based access (`agent` / `admin`), welcome emails via Mailgun
+- "Resend invite" per agent (generates new temp password)
+- Agent activity panel (assigned tickets, recent replies, stats)
 - Fully typed end-to-end (TypeScript on both client and server)
 
 ---
 
 ## Stack
 
-| Layer    | Technology                                      |
-| -------- | ----------------------------------------------- |
-| Frontend | React 18, Vite, TypeScript, Tailwind CSS v3     |
-| Routing  | React Router v6                                 |
-| Backend  | Node.js, Express 4, TypeScript                  |
-| Database | MongoDB Atlas, Mongoose 8                       |
-| Dev tool | ts-node-dev (server hot-reload)                 |
+| Layer      | Technology                                              |
+| ---------- | ------------------------------------------------------- |
+| Frontend   | React 18, Vite, TypeScript, Tailwind CSS v3             |
+| Routing    | React Router v6                                         |
+| Backend    | Node.js, Express 4, TypeScript                          |
+| Database   | MongoDB Atlas, Mongoose 8                               |
+| Storage    | Cloudflare R2 (S3-compatible, signed URLs)              |
+| AI         | Pydantic AI Gateway → AWS Bedrock (Claude Sonnet)       |
+| Email      | Mailgun HTTP API                                        |
+| Auth       | JWT (HS256, 7-day expiry) + bcrypt (cost 12)            |
 
 ---
 
@@ -56,45 +66,64 @@ Key features:
 
 ```
 projectAgilite/
-├── client/                        # Vite + React frontend
-│   ├── public/
+├── client/                          # Vite + React frontend
 │   └── src/
 │       ├── components/
-│       │   ├── Layout.tsx         # Outlet wrapper + Navbar
-│       │   ├── Navbar.tsx         # Sticky header with mobile menu
-│       │   ├── TicketCard.tsx     # Dashboard list row
-│       │   ├── StatusBadge.tsx    # Open / Closed pill
-│       │   ├── PriorityBadge.tsx  # High / Medium / Low pill
-│       │   ├── Spinner.tsx        # Animated loading ring
-│       │   ├── Skeleton.tsx       # TicketCard + Detail skeletons
-│       │   ├── Toast.tsx          # Context-based toast system
-│       │   └── ProductPickerModal.tsx  # Searchable product modal
-│       ├── data/
-│       │   └── products.ts        # Static product catalog
+│       │   ├── admin/
+│       │   │   ├── AdminLayout.tsx  # Sticky nav, settings panel
+│       │   │   └── SettingsPanel.tsx
+│       │   ├── AttachmentGallery.tsx
+│       │   ├── PriorityBadge.tsx
+│       │   ├── Skeleton.tsx
+│       │   ├── StatusBadge.tsx
+│       │   └── Toast.tsx
 │       ├── pages/
-│       │   ├── DashboardPage.tsx  # Ticket list with filters
+│       │   ├── admin/
+│       │   │   ├── AdminDashboardPage.tsx   # Ticket queue + filters
+│       │   │   ├── AdminTicketDetailPage.tsx # Ticket detail + AI panel + Marketing Tools
+│       │   │   ├── AdminAgentsPage.tsx       # Agent list, create, activity slide-over
+│       │   │   └── AdminLoginPage.tsx
 │       │   ├── CreateTicketPage.tsx
-│       │   ├── TicketDetailPage.tsx
-│       │   └── ProductsPage.tsx
+│       │   ├── DashboardPage.tsx
+│       │   ├── ProductsPage.tsx
+│       │   └── TicketDetailPage.tsx
 │       ├── services/
-│       │   └── api.ts             # Typed fetch client
+│       │   ├── adminApi.ts          # Typed admin API client
+│       │   └── api.ts               # Typed customer API client
 │       └── types/
-│           └── ticket.ts          # Shared frontend types
+│           ├── admin.ts
+│           └── ticket.ts
 │
-└── server/                        # Express API
+└── server/
     └── src/
-        ├── config/
-        │   └── db.ts              # Mongoose connection
         ├── controllers/
-        │   └── ticket.controller.ts
+        │   ├── admin.controller.ts  # Ticket management, agent CRUD, products
+        │   ├── aiController.ts      # AI triage, suggest-reply, profile, remarket
+        │   ├── auth.controller.ts   # Login
+        │   ├── ticket.controller.ts # Customer-facing ticket endpoints
+        │   └── upload.controller.ts # S3 presigned upload URLs
         ├── middlewares/
-        │   ├── validate.ts        # Schema-based request validation
-        │   └── errorHandler.ts    # Global error handler
+        │   ├── requireAuth.ts       # JWT verification
+        │   └── errorHandler.ts
         ├── models/
-        │   └── Ticket.ts          # Mongoose schema + model
+        │   ├── Product.ts           # Tactical gear product catalog
+        │   ├── Setting.ts           # App-wide settings (auto-reply toggle)
+        │   ├── Ticket.ts            # Ticket with replies, notes, AI fields
+        │   └── User.ts              # Agent accounts (including AI Agent)
         ├── routes/
+        │   ├── admin.routes.ts
+        │   ├── aiRoutes.ts
+        │   ├── auth.routes.ts
+        │   ├── product.routes.ts
         │   └── ticket.routes.ts
+        ├── services/
+        │   ├── aiAgentService.ts    # AI auto-reply pipeline
+        │   ├── aiService.ts         # All LLM call functions
+        │   ├── emailService.ts      # Mailgun welcome emails
+        │   └── storage.ts           # R2 signed URLs
         └── types/
+            ├── auth.types.ts
+            ├── product.types.ts
             └── ticket.types.ts
 ```
 
@@ -105,99 +134,98 @@ projectAgilite/
 ### Prerequisites
 
 - Node.js 18+
-- A MongoDB Atlas account (free M0 cluster is sufficient)
+- MongoDB Atlas account (free M0 cluster is sufficient)
+- Pydantic AI Gateway API key (for AI features)
+- Mailgun account (for agent welcome emails)
+- Cloudflare R2 bucket (for product images)
 
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/your-org/projectAgilite.git
+git clone https://github.com/DEE755/agilitehomework.git
 cd projectAgilite
 
-# Install server dependencies
 cd server && npm install
-
-# Install client dependencies
 cd ../client && npm install
 ```
 
 ### 2. Configure environment variables
 
+Copy `.env.example` to `.env` in the project root and fill in your values (see [Environment Variables](#environment-variables)).
+
+### 3. Seed the database
+
 ```bash
-cp server/.env.example server/.env
-cp client/.env.example client/.env
+# Create the first admin account
+cd server && npm run seed
+
+# Seed the product catalog (8 items)
+npm run seed:products
+
+# Upload product images to R2 (requires S3 env vars)
+npm run seed:images
 ```
 
-Edit both files with your values (see [Environment Variables](#environment-variables) below).
-
-### 3. Run in development
-
-From the project root:
+### 4. Run in development
 
 ```bash
-npm install
+# From the repo root — starts API + frontend together
 npm run dev
-```
-
-This launches both services together. If you prefer running them separately:
-
-```bash
-# API server (port 5050, hot-reload)
-cd server && npm run dev
-
-# Vite dev server (port 3000, HMR)
-cd client && npm run dev
 ```
 
 | Service | URL                   |
 | ------- | --------------------- |
-| UI      | http://localhost:3000 |
+| Customer portal | http://localhost:3000 |
+| Agent workspace | http://localhost:3000/admin |
 | API     | http://localhost:5050 |
 
-The Vite dev server proxies all `/api/*` requests to `localhost:5050`, so no CORS config is needed during development.
+The Vite dev server proxies all `/api/*` requests to port 5050 — no CORS config needed in development.
 
 ---
 
 ## Environment Variables
 
-### `server/.env`
+All variables live in a single `.env` file at the project root.
 
-| Variable      | Required | Description                                                    |
-| ------------- | -------- | -------------------------------------------------------------- |
-| `PORT`        | No       | Port the Express server listens on. Defaults to `5050`.        |
-| `MONGODB_URI` | Yes      | Full MongoDB Atlas connection string including database name.   |
-| `JWT_SECRET`  | Yes      | Secret used to sign and verify JWT tokens. Must be a long random string in production. |
-| `S3_ENDPOINT` | For image uploads | S3-compatible endpoint. Can include the bucket path, e.g. Cloudflare R2. |
-| `S3_BUCKET`   | No       | Optional bucket override if not embedded in `S3_ENDPOINT`.     |
-| `S3_REGION`   | No       | S3 region. Use `auto` for Cloudflare R2.                       |
-| `S3_ACCESS_KEY_ID` | For image uploads | Access key used to sign upload/read URLs.           |
-| `S3_SECRET_ACCESS_KEY` | For image uploads | Secret key used to sign upload/read URLs.     |
-| `S3_PUBLIC_BASE_URL` | No | Public asset base URL if you serve images publicly instead of signed reads. |
-| `MAILGUN_API_KEY` | For email | Mailgun API key (find it in Mailgun dashboard → API Keys). |
-| `MAILGUN_DOMAIN` | For email | Sending domain — use sandbox domain for testing, custom subdomain for production. |
-| `MAILGUN_FROM_EMAIL` | No | Sender address, e.g. `Agilite Support <no-reply@mail.agilite.com>`. Defaults to `no-reply@{domain}`. |
+| Variable | Required | Description |
+| -------- | -------- | ----------- |
+| `PORT` | No | Express port. Defaults to `5050`. |
+| `MONGODB_URI` | Yes | Full MongoDB Atlas connection string including database name. |
+| `JWT_SECRET` | Yes | Long random string used to sign JWT tokens. **Always set in production.** |
+| `PYDANTIC_AI_GATEWAY_API_KEY` | For AI features | API key for the Pydantic AI Gateway (proxies to AWS Bedrock). |
+| `PYDANTIC_GATEWAY_REGION` | No | Gateway region prefix, e.g. `us`. Defaults to `us`. |
+| `PYDANTIC_ANTHROPIC_MODEL` | No | Model ID. Defaults to `claude-sonnet-4-6`. |
+| `S3_ENDPOINT` | For images | S3-compatible endpoint. For Cloudflare R2 include the bucket path. |
+| `S3_BUCKET` | No | Bucket override if not in `S3_ENDPOINT`. |
+| `S3_REGION` | No | S3 region. Use `auto` for Cloudflare R2. |
+| `S3_ACCESS_KEY_ID` | For images | R2 / S3 access key. |
+| `S3_SECRET_ACCESS_KEY` | For images | R2 / S3 secret key. |
+| `S3_PUBLIC_BASE_URL` | No | Public asset base URL if images are publicly served. |
+| `MAILGUN_API_KEY` | For email | Mailgun API key (Dashboard → API Keys). |
+| `MAILGUN_DOMAIN` | For email | Sending domain — use sandbox for testing, custom domain in production. |
+| `MAILGUN_FROM_EMAIL` | No | Sender address. Defaults to `no-reply@{MAILGUN_DOMAIN}`. |
+| `SEED_EMAIL` | No | Admin email for the seed script. Defaults to `admin@agilite.com`. |
+| `SEED_PASSWORD` | No | Admin password for the seed script. Defaults to `Admin1234!`. |
 
-Example:
+Example `.env`:
 
 ```env
 PORT=5050
-MONGODB_URI=mongodb+srv://user:password@cluster0.xxxxx.mongodb.net/projectagilite?retryWrites=true&w=majority
-JWT_SECRET=replace_with_a_long_random_string
-S3_ENDPOINT=https://dea83c0cf76addca198e38a0f93bd8b0.r2.cloudflarestorage.com/agiliteproject
+MONGODB_URI=mongodb+srv://user:password@cluster.xxxxx.mongodb.net/projectagilite?retryWrites=true&w=majority
+JWT_SECRET=replace_with_64_random_bytes_hex
+
+PYDANTIC_AI_GATEWAY_API_KEY=pyd-...
+PYDANTIC_GATEWAY_REGION=us
+PYDANTIC_ANTHROPIC_MODEL=claude-sonnet-4-6
+
+S3_ENDPOINT=https://<account>.r2.cloudflarestorage.com/<bucket>
 S3_REGION=auto
-S3_ACCESS_KEY_ID=replace_with_your_r2_access_key
-S3_SECRET_ACCESS_KEY=replace_with_your_r2_secret
-```
+S3_ACCESS_KEY_ID=your_r2_access_key
+S3_SECRET_ACCESS_KEY=your_r2_secret
 
-### `client/.env`
-
-| Variable       | Required | Description                                                     |
-| -------------- | -------- | --------------------------------------------------------------- |
-| `VITE_API_URL` | No       | Base URL for API calls. Omit in dev (Vite proxy handles it).   |
-
-Example (production only):
-
-```env
-VITE_API_URL=https://your-api.onrender.com/api
+MAILGUN_API_KEY=key-...
+MAILGUN_DOMAIN=sandbox-xxx.mailgun.org
+MAILGUN_FROM_EMAIL=Agilite Support <no-reply@mail.agilite.com>
 ```
 
 ---
@@ -206,44 +234,155 @@ VITE_API_URL=https://your-api.onrender.com/api
 
 ### Creating the first admin
 
-There is no self-registration endpoint. Use the seed script to bootstrap the first admin account:
+There is no self-registration. Bootstrap the first admin with the seed script:
 
 ```bash
 cd server && npm run seed
 ```
 
-It reads credentials from `server/.env` (falls back to defaults if unset):
-
-| Variable        | Default           |
-| --------------- | ----------------- |
-| `SEED_EMAIL`    | `admin@agilite.com` |
-| `SEED_PASSWORD` | `Admin1234!`      |
-| `SEED_NAME`     | `Admin`           |
-
-The script is idempotent — it skips creation if the email already exists.
+This is idempotent — it skips creation if the email already exists.
 
 ### Managing agents
 
-Once logged in as an admin, go to `/admin/agents` to:
+Navigate to `/admin/agents` (admin role required) to:
 
-- View all agents (including the built-in AI Agent)
-- Create new agents with a name, email, password, and role (`agent` or `admin`)
+- View all agents and the built-in AI Agent
+- Create new agents — they receive a welcome email with login credentials via Mailgun
+- Resend invite — generates a new temporary password and re-sends the welcome email
 - Remove agents (cannot remove yourself or the AI Agent)
+- Click any agent row to view their activity panel — stats (assigned, resolved, replies, notes), last 20 assigned tickets, and recent replies
 
-Agents with the `agent` role can view and respond to tickets but cannot create or remove other accounts. Only `admin` role users can manage agents.
+### Roles
+
+| Role | Capabilities |
+| ---- | ------------ |
+| `agent` | View tickets, reply, add notes, assign to self, run AI tools |
+| `admin` | All agent capabilities + create/remove agents, update settings |
 
 ### JWT rotation
 
-To invalidate all active sessions (e.g. after a suspected token leak):
+To invalidate all active sessions instantly:
 
-1. Generate a new secret:
-   ```bash
-   node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-   ```
-2. Replace `JWT_SECRET` in your environment
-3. Restart the server
+```bash
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+```
 
-All existing JWTs become invalid immediately. Users are redirected to the login page on their next request.
+Replace `JWT_SECRET` in `.env` and restart the server. All existing tokens become invalid immediately.
+
+---
+
+## AI Integration
+
+The AI layer routes requests through the **Pydantic AI Gateway** to AWS Bedrock (Claude Sonnet). All calls are server-side — API keys never reach the browser.
+
+### Auto-triage
+
+When a ticket is created, the pipeline (`aiAgentService`) automatically:
+
+1. Sends the ticket title + description through the triage prompt
+2. Persists `aiSummary`, `aiPriority`, `aiTags`, `aiSuggestedNextStep`, and `aiTriagedAt` on the ticket
+3. If priority is `irrelevant` (spam, gibberish, abusive), auto-closes the ticket with `status: resolved`
+4. If `autoReplyEnabled` is true (Settings panel), assigns the AI Agent and triggers the auto-reply pipeline
+
+### AI Agent auto-reply
+
+Assigning the built-in **Agilite Support AI** agent triggers `runAiAgentPipeline`:
+
+- Runs `suggestReply` — assesses eligibility, confidence, and risk
+- If `autoReplyEligible: true` and confidence ≥ 0.7 and risk ≠ `high`, posts a reply and sets status `in_progress`
+- If not eligible, leaves the ticket unresponded (human review required)
+
+The ticket detail page polls every 2.5 s (up to 90 s) and shows a typing indicator while waiting.
+
+### Suggest Reply (manual)
+
+Agents can click **Suggest Reply** on any ticket. The result is pre-filled into the reply box. If the AI marks it auto-eligible, a **Send AI Reply** shortcut appears.
+
+### AI endpoints
+
+All require `Authorization: Bearer <token>` except `/api/ai/ask`.
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `POST` | `/api/ai/triage-ticket` | Triage a ticket — returns summary, priority, tags, next step |
+| `POST` | `/api/ai/suggest-reply` | Generate a suggested reply with eligibility scoring |
+| `POST` | `/api/ai/customer-profile` | Analyse customer intent and behaviour (see Marketing Tools) |
+| `POST` | `/api/ai/remarket` | Generate a cross-sell product recommendation + pitch |
+| `POST` | `/api/ai/ask` | Customer-facing pre-ticket AI assistant (no auth) |
+
+---
+
+## Marketing Tools
+
+The **Marketing Tools** panel sits in the ticket detail sidebar (collapsed by default, toggled with the `📊` button). It is non-invasive — agents activate it only when relevant.
+
+### Customer Intelligence
+
+Click **Analyse** to profile the customer using the ticket content and full conversation history.
+
+| Signal | Values | Description |
+| ------ | ------ | ----------- |
+| **Archetype** | Early Adopter · Loyal Advocate · Price-Sensitive · Casual Buyer · Frustrated Veteran | Behavioural classification based on tone, language, and context |
+| **Refund Intent** | Low / Medium / High | Likelihood the customer wants a refund or escalation |
+| **Churn Risk** | Low / Medium / High | Risk of losing the customer after this interaction |
+| **Sentiment** | Positive / Neutral / Frustrated / Hostile | Overall emotional tone |
+| **LTV Signal** | High / Medium / Low | Lifetime value signal (multiple purchases, team/military use, etc.) |
+| **Suggested Approach** | Free text | One actionable recommendation for handling this specific customer |
+
+The profiling result is used automatically as context for remarketing — the AI respects hostile or high-refund-intent customers and suppresses sales pitches for them.
+
+### Product Remarketing
+
+Generate a contextual cross-sell or upsell recommendation from the internal product catalog.
+
+**Auto mode (AI picks):**
+- The AI selects the single best complementary product based on the ticket context and customer profile
+- Returns a match reason explaining why the product fits this customer
+- Generates a 2–3 sentence soft-pitch paragraph to append to the support reply
+
+**Manual mode:**
+- Agent selects a product from the dropdown (all active catalog products)
+- AI generates a personalised pitch for that specific product
+
+**Result actions:**
+- **+ Append to Reply** — injects the pitch paragraph directly into the reply text area
+- **Copy** — copies the paragraph to clipboard
+
+**Pitch suppression:** If the customer has `refundIntent: high` or `sentiment: hostile`, the AI sets `shouldPitch: false` and returns a warning instead of a pitch. You will never accidentally upsell an angry customer.
+
+### API endpoints
+
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `POST` | `/api/ai/customer-profile` | Profile a customer from ticket + conversation history |
+| `POST` | `/api/ai/remarket` | Generate product recommendation + pitch paragraph |
+| `GET`  | `/api/admin/products` | List active catalog products with signed image URLs (for manual selector) |
+
+#### `POST /api/ai/customer-profile` body
+
+```json
+{
+  "ticketId": "optional — persists result on ticket",
+  "subject": "Plate carrier strap fraying",
+  "message": "I've bought three of your products and this is the third time...",
+  "productTitle": "Agilite Plate Carrier",
+  "conversationHistory": "Agent (John): ... \nCustomer: ..."
+}
+```
+
+#### `POST /api/ai/remarket` body
+
+```json
+{
+  "subject": "Strap issue on plate carrier",
+  "message": "...",
+  "productTitle": "Agilite Plate Carrier",
+  "customerArchetype": "loyal_advocate",
+  "refundIntent": "low",
+  "sentiment": "neutral",
+  "targetProductId": "optional — omit for auto AI selection"
+}
+```
 
 ---
 
@@ -251,35 +390,36 @@ All existing JWTs become invalid immediately. Users are redirected to the login 
 
 ### Password hashing
 
-All passwords are hashed with **bcrypt** at cost factor 12 before being stored. bcrypt automatically generates and embeds a unique random salt per password — no two hashes are the same even for identical passwords. The raw password is never persisted.
+Passwords are hashed with **bcrypt** at cost factor 12. bcrypt embeds a unique random salt per hash — no two hashes are identical even for the same password. Raw passwords are never stored or logged.
 
 ```ts
-const passwordHash = await bcrypt.hash(password, 12);  // stores salt + hash together
-await bcrypt.compare(plaintext, passwordHash);          // salt is extracted automatically
+const hash = await bcrypt.hash(password, 12);
+await bcrypt.compare(plaintext, hash); // salt extracted automatically
 ```
 
 ### JWT authentication
 
-- Tokens are signed with `HS256` using `JWT_SECRET` and expire after **7 days**
-- All `/api/admin/*` routes require a valid `Authorization: Bearer <token>` header
-- Agent creation and deletion additionally require the `admin` role (`requireRole('admin')`)
-- On 401, the client clears the stored token and redirects to the login page
+- Tokens are signed with `HS256` using `JWT_SECRET`, expire after **7 days**
+- All `/api/admin/*` routes require `Authorization: Bearer <token>`
+- Agent creation / deletion / resend-invite additionally require the `admin` role
+- On 401, the client clears the stored token and redirects to `/admin/login`
 
-### NoSQL injection
+### NoSQL injection prevention
 
-- The login endpoint validates that `email` and `password` are plain strings before any database query, preventing MongoDB operator injection (`{ "$gt": "" }` style attacks)
-- Admin ticket filters receive Mongoose-typed values — Mongoose casts query params to the schema's declared type, so operator objects in query strings are coerced to strings and silently find nothing
-- All `findById` / `findByIdAndUpdate` calls are guarded with `isValidObjectId()` before touching the database
+- The login endpoint validates `typeof email === 'string'` and `typeof password === 'string'` before any database query — prevents MongoDB operator injection (`{ "$gt": "" }` style attacks)
+- All `findById` and `findByIdAndUpdate` calls are gated behind `isValidObjectId()` checks
+- Mongoose casts query filter values to their declared schema types — operator objects in query strings are coerced to strings and find nothing
 
 ### XSS
 
-React escapes all rendered output by default. There is no use of `dangerouslySetInnerHTML` in the codebase.
+React escapes all rendered content by default. There is no `dangerouslySetInnerHTML` in the codebase.
 
 ### Other
 
-- Passwords must be at least 8 characters (enforced on both client and server)
-- The AI Agent account (`ai-agent@agilite.internal`) has a non-loginable password hash and cannot be deleted via the API
-- `JWT_SECRET` falls back to `'dev-secret'` if unset — **always set a real secret in production**
+- Passwords must be ≥ 8 characters (enforced client-side and server-side)
+- The AI Agent (`ai-agent@agilite.internal`) has a non-loginable password hash and cannot be deleted via the API
+- `JWT_SECRET` falls back to `'dev-secret'` if unset — **always override in production**
+- API keys for AI, R2, and Mailgun are never exposed to the frontend
 
 ---
 
@@ -288,156 +428,123 @@ React escapes all rendered output by default. There is no use of `dangerouslySet
 ### 1. Create a cluster
 
 1. Sign in at [mongodb.com/atlas](https://www.mongodb.com/atlas)
-2. Create a new project → **Build a Database** → select **M0 Free**
-3. Choose a cloud provider and region closest to your users
-4. Name your cluster (e.g. `projectagilite`)
+2. **Build a Database** → **M0 Free**
+3. Choose a region close to your users
 
 ### 2. Create a database user
 
-1. In the left sidebar go to **Database Access** → **Add New Database User**
-2. Choose **Password** authentication
-3. Set a username (e.g. `agiliteuser`) and generate a secure password — copy it now
-4. Assign the role **Atlas admin** (or `readWriteAnyDatabase` for tighter scope)
-5. Click **Add User**
+1. **Database Access** → **Add New Database User**
+2. Choose **Password** auth, assign `readWriteAnyDatabase`
 
 ### 3. Allow network access
 
-1. In the left sidebar go to **Network Access** → **Add IP Address**
-2. For development: click **Allow Access from Anywhere** (`0.0.0.0/0`)
-3. For production on Render: add your Render service's static outbound IP, or use `0.0.0.0/0` with a strong password
+1. **Network Access** → **Add IP Address**
+2. Development: **Allow Access from Anywhere** (`0.0.0.0/0`)
+3. Production: add your Render service's outbound IP
 
 ### 4. Get the connection string
 
-1. On your cluster dashboard click **Connect** → **Drivers**
-2. Select **Node.js**, version **5.5 or later**
-3. Copy the URI — it looks like:
+**Connect** → **Drivers** → Node.js:
 
 ```
-mongodb+srv://agiliteuser:<password>@projectagilite.xxxxx.mongodb.net/?retryWrites=true&w=majority
+mongodb+srv://user:password@cluster.xxxxx.mongodb.net/projectagilite?retryWrites=true&w=majority
 ```
 
-4. Replace `<password>` with your actual password
-5. Insert the database name before the `?`:
-
-```
-mongodb+srv://agiliteuser:yourpassword@projectagilite.xxxxx.mongodb.net/projectagilite?retryWrites=true&w=majority
-```
-
-Paste this as `MONGODB_URI` in `server/.env`.
-
-Mongoose will automatically create the `tickets` collection on the first write — no manual schema migration needed.
+Paste as `MONGODB_URI` in `.env`. Mongoose creates collections automatically on first write.
 
 ---
 
 ## Render Deployment
 
-Both the API and the frontend are deployed separately on [Render](https://render.com). The free tier is sufficient for both.
+### API (Web Service)
 
-### Deploy the API (Web Service)
+| Setting | Value |
+| ------- | ----- |
+| Root directory | `server` |
+| Runtime | Node |
+| Build command | `npm install && npm run build` |
+| Start command | `npm start` |
 
-1. Push your code to GitHub
-2. In the Render dashboard → **New** → **Web Service**
-3. Connect your GitHub repo
-4. Configure the service:
+Environment variables to set: `MONGODB_URI`, `JWT_SECRET`, `NODE_ENV=production`, and all AI / S3 / Mailgun vars.
 
-   | Setting          | Value                        |
-   | ---------------- | ---------------------------- |
-   | **Root directory** | `server`                   |
-   | **Runtime**      | Node                         |
-   | **Build command** | `npm install && npm run build` |
-   | **Start command** | `npm start`                 |
+### Frontend (Static Site)
 
-5. Under **Environment Variables**, add:
+| Setting | Value |
+| ------- | ----- |
+| Root directory | `client` |
+| Build command | `npm install && npm run build` |
+| Publish directory | `dist` |
 
-   ```
-   MONGODB_URI   = <your Atlas connection string>
-   JWT_SECRET    = <your secret>
-   NODE_ENV      = production
-   ```
+Environment variable: `VITE_API_URL=https://your-api.onrender.com/api`
 
-6. Click **Create Web Service**. Render will assign a URL like `https://projectagilite-api.onrender.com`.
-
-### Deploy the Frontend (Static Site)
-
-1. In the Render dashboard → **New** → **Static Site**
-2. Connect the same GitHub repo
-3. Configure the site:
-
-   | Setting           | Value              |
-   | ----------------- | ------------------ |
-   | **Root directory** | `client`          |
-   | **Build command** | `npm install && npm run build` |
-   | **Publish directory** | `dist`        |
-
-4. Under **Environment Variables**, add:
-
-   ```
-   VITE_API_URL = https://projectagilite-api.onrender.com/api
-   ```
-
-5. Click **Create Static Site**
-
-6. Under **Redirects/Rewrites**, add a rewrite rule so React Router works on hard refresh:
-
-   | Source  | Destination | Action  |
-   | ------- | ----------- | ------- |
-   | `/*`    | `/index.html` | Rewrite |
+Add a rewrite rule for React Router: `/* → /index.html` (Rewrite).
 
 ### CORS in production
 
-When the frontend and API are on different domains, update the CORS config in `server/src/index.ts` to restrict the allowed origin:
-
-```typescript
-app.use(cors({
-  origin: process.env.CLIENT_URL ?? '*',
-}));
+```ts
+app.use(cors({ origin: process.env.CLIENT_URL ?? '*' }));
 ```
 
-Add `CLIENT_URL=https://your-frontend.onrender.com` to the API service's environment variables on Render.
+Add `CLIENT_URL=https://your-frontend.onrender.com` to the API service's environment.
 
 ---
 
 ## API Reference
 
-All endpoints are prefixed with `/api`.
+All endpoints prefixed with `/api`. Admin routes require `Authorization: Bearer <token>`.
 
-### Tickets
+### Customer-facing
 
-| Method  | Path                            | Description                               |
-| ------- | ------------------------------- | ----------------------------------------- |
-| `GET`   | `/tickets`                      | List tickets (paginated, filterable)       |
-| `GET`   | `/tickets/:ticketId`            | Get a single ticket with full reply thread |
-| `POST`  | `/tickets`                      | Create a new ticket                       |
-| `POST`  | `/tickets/:ticketId/replies`    | Add a reply to an open ticket             |
-| `PATCH` | `/tickets/:ticketId/close`      | Close a ticket                            |
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/tickets` | List tickets (paginated) |
+| `GET` | `/tickets/:id` | Get ticket with reply thread |
+| `POST` | `/tickets` | Create ticket |
+| `POST` | `/tickets/:id/replies` | Add customer reply |
+| `PATCH` | `/tickets/:id/close` | Close ticket |
+| `GET` | `/products` | Product catalog (external) |
 
-### Query parameters for `GET /tickets`
+### Admin — Tickets
 
-| Param      | Type                         | Description                     |
-| ---------- | ---------------------------- | ------------------------------- |
-| `status`   | `open` \| `closed`           | Filter by ticket status         |
-| `priority` | `low` \| `medium` \| `high`  | Filter by priority level        |
-| `page`     | number (default `1`)         | Page number                     |
-| `limit`    | number (default `20`, max `100`) | Results per page            |
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/admin/tickets` | Paginated ticket list with filters |
+| `GET` | `/admin/tickets/:id` | Ticket detail with product + notes |
+| `PATCH` | `/admin/tickets/:id/status` | Update status (`new` / `in_progress` / `resolved`) |
+| `PATCH` | `/admin/tickets/:id/priority` | Update priority (`low` / `medium` / `high` / `irrelevant`) |
+| `PATCH` | `/admin/tickets/:id/assign` | Assign to agent (or `null` to unassign) |
+| `POST` | `/admin/tickets/:id/notes` | Add internal note |
+| `POST` | `/admin/tickets/:id/reply` | Send agent reply |
 
-### `POST /tickets` body
+### Admin — Agents (admin role required for write operations)
 
-```json
-{
-  "title": "Plate carrier strap fraying after 3 months",
-  "description": "The left shoulder strap started fraying at the buckle...",
-  "priority": "high",
-  "authorName": "John Recon",
-  "authorEmail": "john@unit.mil"
-}
-```
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/admin/agents` | List all agents |
+| `POST` | `/admin/agents` | Create agent (sends welcome email) |
+| `DELETE` | `/admin/agents/:id` | Remove agent |
+| `POST` | `/admin/agents/:id/resend-invite` | Reset password + resend welcome email |
+| `GET` | `/admin/agents/:id/activity` | Agent stats, assigned tickets, recent replies |
 
-### Error format
+### Admin — Other
 
-```json
-{ "error": "Ticket not found" }
-{ "errors": ["\"authorEmail\" must be a valid email"] }
-```
+| Method | Path | Description |
+| ------ | ---- | ----------- |
+| `GET` | `/admin/stats` | Ticket counts by status + unassigned count |
+| `GET` | `/admin/tags` | Distinct AI-generated tags |
+| `GET` | `/admin/products` | Active product catalog with signed image URLs |
+| `GET` | `/admin/settings` | App settings (auto-reply toggle) |
+| `PATCH` | `/admin/settings` | Update app settings |
+
+### AI
+
+| Method | Path | Auth | Description |
+| ------ | ---- | ---- | ----------- |
+| `POST` | `/api/ai/ask` | None | Customer pre-ticket assistant |
+| `POST` | `/api/ai/triage-ticket` | Agent | Triage ticket — summary, priority, tags |
+| `POST` | `/api/ai/suggest-reply` | Agent | Suggested reply with eligibility scoring |
+| `POST` | `/api/ai/customer-profile` | Agent | Customer archetype, refund risk, churn risk |
+| `POST` | `/api/ai/remarket` | Agent | Cross-sell product recommendation + pitch |
 
 ---
 
@@ -445,44 +552,28 @@ All endpoints are prefixed with `/api`.
 
 ### Root
 
-| Command            | Description                                   |
-| ------------------ | --------------------------------------------- |
-| `npm run dev`      | Start backend and frontend together           |
-| `npm run dev:server` | Start only the Express API from the repo root |
-| `npm run dev:client` | Start only the Vite frontend from the repo root |
-| `npm run build`    | Build server and client in sequence           |
+| Command | Description |
+| ------- | ----------- |
+| `npm run dev` | Start API + frontend together |
+| `npm run dev:server` | Start API only |
+| `npm run dev:client` | Start frontend only |
+| `npm run build` | Build server + client in sequence |
 
 ### Server
 
-| Command           | Description                                          |
-| ----------------- | ---------------------------------------------------- |
-| `npm run dev`     | Start with `ts-node-dev` — hot-reload on file change |
-| `npm run build`   | Compile TypeScript to `dist/`                        |
-| `npm start`       | Run compiled output (`node dist/index.js`)           |
+| Command | Description |
+| ------- | ----------- |
+| `npm run dev` | Hot-reload with `ts-node-dev` |
+| `npm run build` | Compile TypeScript to `dist/` |
+| `npm start` | Run compiled build |
+| `npm run seed` | Create first admin account |
+| `npm run seed:products` | Seed product catalog to MongoDB |
+| `npm run seed:images` | Upload product images to R2 |
 
 ### Client
 
-| Command           | Description                                          |
-| ----------------- | ---------------------------------------------------- |
-| `npm run dev`     | Start Vite dev server with HMR on port 3000          |
-| `npm run build`   | Type-check and bundle to `dist/`                     |
-| `npm run preview` | Serve the production build locally for final checks  |
-
----
-
-## Potential Improvements
-
-### Notifications
-- Email notifications on new reply or status change (Resend or Nodemailer)
-- In-app notification bell with unread count
-
-### Dashboard & analytics
-- Average response time and first-response SLA tracking
-- Agent workload view
-- Priority heatmap by product category
-
-### Developer experience
-- End-to-end tests with Playwright
-- Unit tests for controllers
-- GitHub Actions CI pipeline (type-check + test on push)
-- Docker Compose for one-command local setup (API + MongoDB)
+| Command | Description |
+| ------- | ----------- |
+| `npm run dev` | Vite dev server with HMR on port 3000 |
+| `npm run build` | Type-check + bundle to `dist/` |
+| `npm run preview` | Serve production build locally |

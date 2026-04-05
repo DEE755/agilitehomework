@@ -414,7 +414,7 @@ export default function CreateTicketPage() {
                 type="text"
                 value={aiQuestion}
                 onChange={(e) => setAiQuestion(e.target.value)}
-                placeholder="e.g. What size plate carrier fits a 38&quot; chest?"
+                placeholder="e.g. What size carry vest fits a 38&quot; chest?"
                 disabled={aiAsk.stage === 'asking'}
                 autoFocus
                 className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-olive-500/20 disabled:opacity-50"

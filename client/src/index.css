@@ -5,8 +5,9 @@
 @tailwind utilities;
 
 @layer base {
-  html {
+  html, body {
     @apply bg-zinc-950 text-zinc-100 antialiased;
+    overflow-x: hidden;
   }
 
   ::selection {

@@ -6,6 +6,7 @@ import type { TicketStatus, TicketPriority } from '../../types/ticket';
 import StatusBadge from '../../components/StatusBadge';
 import PriorityBadge from '../../components/PriorityBadge';
 import { TicketCardSkeleton } from '../../components/Skeleton';
+import InsightsPanel from '../../components/admin/InsightsPanel';
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -30,6 +31,7 @@ type PriorityFilter = TicketPriority | 'all';
 export type SortKey =
   | 'date'
   | 'ai_priority'
+  | 'ticket_value'
   | 'refund_risk'
   | 'churn_risk'
   | 'sentiment'
@@ -39,6 +41,7 @@ export type SortKey =
 const SORT_OPTIONS: { key: SortKey; label: string; group: 'standard' | 'marketing' }[] = [
   { key: 'date',          label: 'Date',                group: 'standard'  },
   { key: 'ai_priority',   label: 'Priority',            group: 'standard'  },
+  { key: 'ticket_value',  label: 'Ticket Value',        group: 'standard'  },
   { key: 'refund_risk',   label: 'Refund Risk',         group: 'marketing' },
   { key: 'churn_risk',    label: 'Churn Risk',          group: 'marketing' },
   { key: 'sentiment',     label: 'Customer Sentiment',  group: 'marketing' },
@@ -174,6 +177,11 @@ function MktBadge({ ticket, sortBy }: { ticket: AdminTicketSummary; sortBy: Sort
       label = ticket.mktArchetypeLabel;
       cls = 'border-violet-500/30 bg-violet-500/10 text-violet-400';
       break;
+    case 'ticket_value':
+      if (!ticket.product?.price) { label = 'No product'; break; }
+      label = `$${ticket.product.price}`;
+      cls = 'border-olive-500/30 bg-olive-500/10 text-olive-400';
+      break;
   }
 
   if (!label) return null;
@@ -204,7 +212,10 @@ export default function AdminDashboardPage() {
   const [priority,   setPriority]   = useState<PriorityFilter>('all');
   const [assignedTo, setAssignedTo] = useState<string>('');
   const [activeTag,  setActiveTag]  = useState<string>('');
+  const [insightsOpen, setInsightsOpen] = useState(false);
   const [sortBy,     setSortBy]     = useState<SortKey>('date');
+  const [expanded,   setExpanded]   = useState<Set<string>>(new Set());
+  const [showMktCols, setShowMktCols] = useState(false);
   const [page,       setPage]       = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total,      setTotal]      = useState(0);
@@ -270,6 +281,8 @@ export default function AdminDashboardPage() {
         if (nullLast(a.mktArchetypeLabel) !== nullLast(b.mktArchetypeLabel))
           return nullLast(a.mktArchetypeLabel) - nullLast(b.mktArchetypeLabel);
         return (a.mktArchetypeLabel ?? '').localeCompare(b.mktArchetypeLabel ?? '');
+      case 'ticket_value':
+        return (b.product?.price ?? 0) - (a.product?.price ?? 0);
       case 'ai_priority':
         return (PRIORITY_ORDER[a.aiPriority ?? ''] ?? 9) - (PRIORITY_ORDER[b.aiPriority ?? ''] ?? 9);
       default: // 'date'
@@ -277,7 +290,7 @@ export default function AdminDashboardPage() {
     }
   });
 
-  const isMarketingSort = ['refund_risk', 'churn_risk', 'sentiment', 'lifetime_value', 'archetype'].includes(sortBy);
+  const isMarketingSort = ['refund_risk', 'churn_risk', 'sentiment', 'lifetime_value', 'archetype', 'ticket_value'].includes(sortBy);
 
   return (
     <div>
@@ -304,8 +317,8 @@ export default function AdminDashboardPage() {
           <StatCard label="Resolved"    value={stats.resolved}    color="text-violet-400" />
           <StatCard label="Unassigned"  value={stats.unassigned}  color="text-red-400" />
           <button
-            disabled
-            className="rounded-xl border border-violet-500/20 bg-violet-500/5 px-5 py-4 text-left transition hover:bg-violet-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => setInsightsOpen(true)}
+            className="rounded-xl border border-violet-500/20 bg-violet-500/5 px-5 py-4 text-left transition hover:bg-violet-500/10"
           >
             <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500">AI Insights</p>
             <p className="mt-1 text-xs text-violet-400">View report →</p>
@@ -363,6 +376,23 @@ export default function AdminDashboardPage() {
         </select>
 
         <ClassByDropdown value={sortBy} onChange={setSortBy} />
+
+        <button
+          onClick={() => setShowMktCols((v) => !v)}
+          title={showMktCols ? 'Hide marketing intelligence columns' : 'Show marketing intelligence columns'}
+          className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition ${
+            showMktCols
+              ? 'border-rose-500/40 bg-rose-500/10 text-rose-400 hover:bg-rose-500/15'
+              : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300'
+          }`}
+        >
+          <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5">
+            <path d="M1 10s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+            <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
+            {!showMktCols && <line x1="3" y1="3" x2="17" y2="17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>}
+          </svg>
+          <span className="hidden sm:inline">{showMktCols ? 'Hide intel' : 'Show intel'}</span>
+        </button>
       </div>
 
       <div className="mb-5 h-px bg-zinc-800" />
@@ -392,6 +422,8 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      <InsightsPanel open={insightsOpen} onClose={() => setInsightsOpen(false)} />
+
       {/* Table */}
       {!loading && !error && tickets.length > 0 && (
         <>
@@ -411,6 +443,12 @@ export default function AdminDashboardPage() {
                   <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Priority</th>
                   <th className="hidden px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-600 sm:table-cell">Assigned</th>
                   <th className="hidden px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-600 lg:table-cell">Age</th>
+                  {showMktCols && <>
+                    <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-rose-500/60">Value</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-rose-500/60">Sentiment</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-rose-500/60">Refund Risk</th>
+                    <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-rose-500/60">Archetype</th>
+                  </>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/60">
@@ -430,7 +468,14 @@ export default function AdminDashboardPage() {
                           </div>
                         ) : null}
                         <div className="min-w-0">
-                          <p className="font-medium text-zinc-200 group-hover:text-white line-clamp-1">{ticket.title}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-zinc-200 group-hover:text-white line-clamp-1">{ticket.title}</p>
+                            {ticket.product?.price != null && (
+                              <span className="shrink-0 rounded-full border border-olive-500/30 bg-olive-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-olive-400">
+                                ${ticket.product.price}
+                              </span>
+                            )}
+                          </div>
                           {ticket.product ? (
                             <p className="mt-0.5 truncate text-xs text-zinc-600">
                               <span className="text-zinc-500">{ticket.product.name}</span>
@@ -440,7 +485,34 @@ export default function AdminDashboardPage() {
                           ) : (
                             <p className="mt-0.5 text-xs text-zinc-600">{ticket.authorName} · {ticket.authorEmail}</p>
                           )}
-                          {isMarketingSort && <MktBadge ticket={ticket} sortBy={sortBy} />}
+                          {/* Description preview */}
+                          {ticket.description && (() => {
+                            const isOpen = expanded.has(ticket._id);
+                            const LIMIT = 90;
+                            const short = ticket.description.length > LIMIT;
+                            return (
+                              <p className="mt-1 text-[11px] leading-snug text-zinc-600">
+                                {isOpen ? ticket.description : ticket.description.slice(0, LIMIT).trimEnd()}
+                                {short && !isOpen && '… '}
+                                {short && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      setExpanded((prev) => {
+                                        const next = new Set(prev);
+                                        isOpen ? next.delete(ticket._id) : next.add(ticket._id);
+                                        return next;
+                                      });
+                                    }}
+                                    className="ml-0.5 text-[10px] font-semibold text-zinc-500 hover:text-zinc-300 underline underline-offset-2"
+                                  >
+                                    {isOpen ? 'show less' : 'show more'}
+                                  </button>
+                                )}
+                              </p>
+                            );
+                          })()}
+                          {isMarketingSort && !showMktCols && <MktBadge ticket={ticket} sortBy={sortBy} />}
                         </div>
                       </Link>
                     </td>
@@ -450,9 +522,15 @@ export default function AdminDashboardPage() {
                       {ticket.assignedTo ? (
                         <div className="flex flex-col gap-1">
                           <span className="inline-flex items-center gap-1.5 text-xs text-zinc-400">
-                            <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${ticket.assignedTo.isAiAgent ? 'bg-violet-500/20 text-violet-400' : 'bg-zinc-700 text-zinc-300'}`}>
-                              {ticket.assignedTo.isAiAgent ? '✦' : ticket.assignedTo.name[0]?.toUpperCase()}
-                            </span>
+                            {ticket.assignedTo.isAiAgent ? (
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-500/20 text-[10px] font-bold text-violet-400">✦</span>
+                            ) : ticket.assignedTo.avatarUrl ? (
+                              <img src={ticket.assignedTo.avatarUrl} alt={ticket.assignedTo.name} className="h-5 w-5 rounded-full object-cover" />
+                            ) : (
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-700 text-[10px] font-bold text-zinc-300">
+                                {ticket.assignedTo.name[0]?.toUpperCase()}
+                              </span>
+                            )}
                             {ticket.assignedTo.name}
                           </span>
                           {ticket.assignedTo.isAiAgent && ticket.aiAutoAssigned && (
@@ -468,6 +546,34 @@ export default function AdminDashboardPage() {
                     <td className="hidden px-4 py-3.5 text-xs text-zinc-600 lg:table-cell">
                       {formatAge(ticket.createdAt)}
                     </td>
+                    {showMktCols && <>
+                      <td className="px-4 py-3.5 text-xs">
+                        {ticket.product?.price != null
+                          ? <span className="font-semibold text-olive-400">${ticket.product.price}</span>
+                          : <span className="text-zinc-700">—</span>}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {ticket.mktSentiment
+                          ? <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold ${SENTIMENT_COLOR[ticket.mktSentiment] ?? 'border-zinc-700 bg-zinc-800 text-zinc-400'}`}>
+                              {ticket.mktSentiment.charAt(0).toUpperCase() + ticket.mktSentiment.slice(1)}
+                            </span>
+                          : <span className="text-[9px] text-zinc-700">—</span>}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {ticket.mktRefundIntent
+                          ? <span className={`inline-flex rounded-full border px-2 py-0.5 text-[9px] font-semibold ${RISK_COLOR[ticket.mktRefundIntent] ?? 'border-zinc-700 bg-zinc-800 text-zinc-400'}`}>
+                              {ticket.mktRefundIntent.charAt(0).toUpperCase() + ticket.mktRefundIntent.slice(1)}
+                            </span>
+                          : <span className="text-[9px] text-zinc-700">—</span>}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {ticket.mktArchetypeLabel
+                          ? <span className="inline-flex rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[9px] font-semibold text-violet-400">
+                              {ticket.mktArchetypeLabel}
+                            </span>
+                          : <span className="text-[9px] text-zinc-700">—</span>}
+                      </td>
+                    </>}
                   </tr>
                 ))}
               </tbody>

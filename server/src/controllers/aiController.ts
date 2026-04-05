@@ -1,7 +1,8 @@
 import type { Request, Response } from 'express';
 import { isValidObjectId } from 'mongoose';
-import { triageTicket, suggestReply, testConnection, customerAsk, analyzeCustomerProfile, generateRemarketingPitch, agentCoachChat } from '../services/aiService';
-import type { CoachMessage, CoachContext } from '../services/aiService';
+import { triageTicket, suggestReply, testConnection, customerAsk, analyzeCustomerProfile, generateRemarketingPitch, agentCoachChat, productFinderChat } from '../services/aiService';
+import type { CoachMessage, CoachContext, FinderMessage } from '../services/aiService';
+import { ProductFinderLead } from '../models/ProductFinderLead';
 import { Ticket } from '../models/Ticket';
 import { Product } from '../models/Product';
 import { getObjectUrl } from '../services/storage';
@@ -295,6 +296,53 @@ export async function testHandler(_req: Request, res: Response): Promise<void> {
     res.json({ data: { reply } });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'AI test failed';
+    const status = msg.includes('not configured') ? 503 : 502;
+    res.status(status).json({ error: msg });
+  }
+}
+
+// POST /api/ai/finder  (public — no auth)
+export async function productFinderHandler(req: Request, res: Response): Promise<void> {
+  const { history, email } = req.body as {
+    history?: unknown;
+    email?: unknown;
+  };
+
+  const safeHistory: FinderMessage[] = Array.isArray(history)
+    ? (history as { role?: unknown; content?: unknown }[])
+        .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+        .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content as string }))
+    : [];
+
+  try {
+    const products = await Product.find({ isActive: true })
+      .select('slug name category description price')
+      .lean();
+
+    const catalog = products.map((p) => ({
+      slug:        p.slug,
+      name:        p.name,
+      category:    p.category,
+      description: p.description,
+      price:       p.price ?? null,
+    }));
+
+    const result = await productFinderChat(safeHistory, catalog);
+
+    // Fire-and-forget: save/update lead when AI has profile data or recommendations
+    if (result.recommendations.length > 0 || result.profile.useCase) {
+      void ProductFinderLead.create({
+        email:            typeof email === 'string' && email.trim() ? email.trim() : undefined,
+        profile:          result.profile,
+        recommendedSlugs: result.recommendations,
+        messageCount:     safeHistory.length + 1,
+        rawHistory:       [...safeHistory, { role: 'assistant', content: result.message }],
+      }).catch(() => { /* non-fatal */ });
+    }
+
+    res.json({ data: result });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Product finder failed';
     const status = msg.includes('not configured') ? 503 : 502;
     res.status(status).json({ error: msg });
   }

@@ -4,6 +4,7 @@ export interface IProduct {
   category: string;
   description: string;
   sku: string;
+  price?: number;
   imageKey?: string;
   sortOrder: number;
   isActive: boolean;

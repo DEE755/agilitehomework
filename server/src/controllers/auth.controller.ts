@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
+import { getObjectUrl } from '../services/storage';
 
 // POST /api/auth/login
 export async function login(req: Request, res: Response): Promise<void> {
@@ -31,6 +32,8 @@ export async function login(req: Request, res: Response): Promise<void> {
     { expiresIn: '7d' },
   );
 
+  const avatarUrl = user.avatarKey ? await getObjectUrl(user.avatarKey) : undefined;
+
   res.json({
     token,
     agent: {
@@ -39,6 +42,7 @@ export async function login(req: Request, res: Response): Promise<void> {
       email:              user.email,
       role:               user.role,
       mustChangePassword: user.mustChangePassword ?? false,
+      avatarUrl,
     },
   });
 }

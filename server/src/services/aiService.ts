@@ -129,7 +129,7 @@ async function chatCompletion(systemPrompt: string, userContent: string, timeout
 // Triage
 // ---------------------------------------------------------------------------
 
-const TRIAGE_SYSTEM_PROMPT = `You are an expert customer support triage agent for a premium tactical gear brand.
+const TRIAGE_SYSTEM_PROMPT = `You are an expert customer support triage agent for a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
 Analyse the support ticket and return a JSON object with exactly these fields:
 {
   "summary": "One or two sentence plain-English summary of the customer's issue.",
@@ -147,7 +147,7 @@ Priority guidelines:
 Use "irrelevant" only for clearly harmful or completely meaningless content. A casual "yo nice shirt!" or "love your products" is low priority and deserves a warm reply, not dismissal.
 When priority is "irrelevant", set suggestedNextStep to "Auto-close this ticket." and tags to ["spam"] or ["abusive"] as appropriate.
 
-Tags should be concise lowercase keywords (2-5 tags), e.g. ["shipping", "plate-carrier", "sizing"].
+Tags should be concise lowercase keywords (2-5 tags), e.g. ["shipping", "carry-vest", "sizing"].
 Respond with valid JSON only.`;
 
 export async function triageTicket(input: {
@@ -192,7 +192,7 @@ export async function triageTicket(input: {
 // Suggest Reply
 // ---------------------------------------------------------------------------
 
-const REPLY_SYSTEM_PROMPT = `You are an expert customer support AI for a premium tactical gear brand (Agilite).
+const REPLY_SYSTEM_PROMPT = `You are an expert customer support AI for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
 
 Analyse the support ticket and return ONLY a JSON object with these exact fields:
 {
@@ -264,12 +264,12 @@ export async function suggestReply(input: {
 // Customer self-service ask
 // ---------------------------------------------------------------------------
 
-const CUSTOMER_ASK_PROMPT = `You are a helpful support assistant for Agilite, a premium tactical gear brand.
+const CUSTOMER_ASK_PROMPT = `You are a helpful support assistant for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
 A customer is asking a quick question before opening a support ticket. Help them concisely if you can.
 
 Return a JSON object with exactly these fields:
 {
-  "answer": "2-4 sentence helpful answer. Friendly, professional, specific to tactical gear.",
+  "answer": "2-4 sentence helpful answer. Friendly, professional, specific to the product.",
   "shouldEscalate": true | false,
   "suggestedTitle": "A concise ticket title (max 80 chars) summarising the customer's issue, as if they wrote it themselves.",
   "suggestedDescription": "A clear 2-3 sentence ticket description written from the customer's perspective, expanding on their question with relevant context."
@@ -316,7 +316,7 @@ export async function customerAsk(question: string, product?: { name: string; ca
 // Customer Profile Analysis
 // ---------------------------------------------------------------------------
 
-const CUSTOMER_PROFILE_PROMPT = `You are an expert customer success and sales analyst for a premium tactical gear brand (Agilite).
+const CUSTOMER_PROFILE_PROMPT = `You are an expert customer success and sales analyst for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
 
 Analyse the support ticket including subject, message, and any agent/customer conversation history to deeply profile the customer.
 
@@ -353,7 +353,7 @@ Churn risk:
 Sentiment: analyse the overall emotional tone.
 
 Lifetime value signal:
-- high: mentions multiple purchases, large orders, professional/military use, team purchases
+- high: mentions multiple purchases, large orders, professional/team use, bulk orders
 - medium: regular consumer purchase, moderate engagement
 - low: single low-value item, no loyalty signals
 
@@ -416,7 +416,7 @@ export async function analyzeCustomerProfile(input: {
 // Remarketing Pitch Generator
 // ---------------------------------------------------------------------------
 
-const REMARKET_SYSTEM_PROMPT = `You are an expert product recommender for Agilite, a premium tactical gear brand.
+const REMARKET_SYSTEM_PROMPT = `You are an expert product recommender for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
 Your goal is to suggest ONE product to cross-sell or upsell to a customer based on their support ticket context and customer profile, and generate a warm, non-pushy pitch.
 
 You will receive: the customer's issue, their profile archetype, and a catalog of available products.
@@ -576,9 +576,9 @@ function buildCoachSystemPrompt(ctx: CoachContext): string {
       ].filter(Boolean).join(' and ')} ${!hasAiInsights && !hasCustomerProfile ? 'have' : 'has'} not been run yet. Proactively mention this when relevant and tell the agent where to find the button.`
     : '';
 
-  return `You are an expert customer success coach and commercial strategist coaching a support agent in real time for Agilite, a premium tactical gear brand.
+  return `You are an expert customer success coach and commercial strategist coaching a support agent in real time for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
 
-Your role: give sharp, actionable, field-ready guidance. Think like a senior sales manager briefing a rep before a difficult call — direct, tactical, no fluff. Keep responses focused (150–250 words unless the agent asks for more detail).
+Your role: give sharp, actionable guidance. Think like a senior sales manager briefing a rep before a difficult call — direct, strategic, no fluff. Keep responses focused (150–250 words unless the agent asks for more detail).
 
 When suggesting exact phrases the agent can use with the customer, format them on their own line like this:
 → "Exact suggested wording here."
@@ -608,7 +608,7 @@ On the first message, deliver a crisp tactical briefing structured as:
 3. Your recommended opening move
 4. One thing to avoid
 
-If key data (AI Insights or Customer Intelligence) is missing, mention it briefly as step 0 before the briefing. Then invite follow-up questions. Stay in coach mode throughout — always advise, never act as the customer or the agent directly.`;
+If key data (AI Insights or Customer Intelligence) is missing, mention it briefly as step 0 before the briefing. Then invite follow-up questions. Stay in advisor mode throughout — always advise, never act as the customer or the agent directly.`;
 }
 
 export async function agentCoachChat(
@@ -632,6 +632,259 @@ export async function agentCoachChat(
   }
 
   return chatRaw(systemPrompt, messages);
+}
+
+// ---------------------------------------------------------------------------
+// Product Finder — guided customer chat with data collection
+// ---------------------------------------------------------------------------
+
+export interface FinderMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface FinderCatalogItem {
+  slug: string;
+  name: string;
+  category: string;
+  description: string;
+  price?: number | null;
+}
+
+export interface FinderProfile {
+  useCase:         string | null;
+  experienceLevel: string | null;
+  budget:          string | null;
+  environment:     string | null;
+  notes:           string | null;
+}
+
+export interface FinderResponse {
+  message:       string;
+  quickReplies:  string[];
+  phase:         'questioning' | 'recommending' | 'following_up';
+  recommendations: string[];   // product slugs
+  profile:       FinderProfile;
+}
+
+function buildFinderSystemPrompt(catalog: FinderCatalogItem[]): string {
+  const catalogLines = catalog
+    .map((p) => `  - slug: "${p.slug}" | ${p.name}${p.price != null ? ` ($${p.price})` : ''} | ${p.category} | ${p.description.slice(0, 120)}`)
+    .join('\n');
+
+  return `You are a friendly, knowledgeable product advisor for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories. Your goal is to have a short, focused conversation to understand the customer's needs and recommend the perfect products.
+
+Conversation rules:
+- Ask ONE question at a time, never multiple at once
+- Ask at most 4 questions before making recommendations — don't over-interview
+- Be warm, confident, and concise — like a trusted personal shopper, not a form
+- Always recommend 1–3 products maximum from the catalog below
+- Provide 2–4 quick reply chips when asking questions (short, tappable options)
+- After recommending, stay available for follow-up questions
+
+Available catalog:
+${catalogLines}
+
+You MUST always respond with a single JSON object with EXACTLY these fields:
+{
+  "message": "Your conversational text response here",
+  "quickReplies": ["Option A", "Option B", "Option C"],
+  "phase": "questioning",
+  "recommendations": [],
+  "profile": {
+    "useCase": null,
+    "experienceLevel": null,
+    "budget": null,
+    "environment": null,
+    "notes": null
+  }
+}
+
+Phase values:
+- "questioning" — still gathering info
+- "recommending" — you have enough to recommend (fill recommendations with product slugs)
+- "following_up" — after recommendations, answering further questions (keep recommendations filled)
+
+Profile: extract what you've learned so far, null for unknown fields.
+Recommendations: array of product slugs from the catalog. Empty during questioning.
+QuickReplies: short tap-friendly options matching the current question. Empty array for open questions.
+
+On the very first turn (empty history), start with:
+→ A warm one-sentence welcome
+→ Your first question about what they're shopping for or what category interests them
+→ 3–4 quick reply options
+
+Respond with valid JSON only. No markdown, no code fences.`;
+}
+
+export async function productFinderChat(
+  history: FinderMessage[],
+  catalog: FinderCatalogItem[],
+): Promise<FinderResponse> {
+  const systemPrompt = buildFinderSystemPrompt(catalog);
+
+  // Ensure the conversation starts with a user message (Bedrock requirement)
+  const messages: BedrockMessage[] = history.map((m) => ({
+    role: m.role,
+    content: [{ text: m.content }],
+  }));
+
+  if (messages.length === 0 || messages[0].role !== 'user') {
+    messages.unshift({
+      role: 'user',
+      content: [{ text: 'Hello, I need help finding the right product.' }],
+    });
+  }
+
+  const raw = await chatRaw(systemPrompt, messages);
+
+  // Extract JSON from response
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('No JSON found in finder response');
+
+  type RawFinder = {
+    message?: unknown;
+    quickReplies?: unknown;
+    phase?: unknown;
+    recommendations?: unknown;
+    profile?: {
+      useCase?: unknown;
+      experienceLevel?: unknown;
+      budget?: unknown;
+      environment?: unknown;
+      notes?: unknown;
+    };
+  };
+
+  const p = JSON.parse(match[0]) as RawFinder;
+
+  return {
+    message:        typeof p.message === 'string' ? p.message : '',
+    quickReplies:   Array.isArray(p.quickReplies) ? (p.quickReplies as unknown[]).map(String) : [],
+    phase:          (p.phase === 'recommending' || p.phase === 'following_up') ? p.phase : 'questioning',
+    recommendations: Array.isArray(p.recommendations) ? (p.recommendations as unknown[]).map(String) : [],
+    profile: {
+      useCase:         typeof p.profile?.useCase         === 'string' ? p.profile.useCase         : null,
+      experienceLevel: typeof p.profile?.experienceLevel === 'string' ? p.profile.experienceLevel : null,
+      budget:          typeof p.profile?.budget          === 'string' ? p.profile.budget          : null,
+      environment:     typeof p.profile?.environment     === 'string' ? p.profile.environment     : null,
+      notes:           typeof p.profile?.notes           === 'string' ? p.profile.notes           : null,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Store AI Insights — marketing expert analysis of all ticket data
+// ---------------------------------------------------------------------------
+
+export interface StoreInsightsInput {
+  totalTickets:      number;
+  openTickets:       number;
+  resolvedTickets:   number;
+  priorityBreakdown: Record<string, number>;   // { high: N, medium: N, low: N, irrelevant: N }
+  sentimentBreakdown:Record<string, number>;
+  archetypeBreakdown:Record<string, number>;
+  refundIntentBreakdown: Record<string, number>;
+  churnRiskBreakdown:    Record<string, number>;
+  ltvBreakdown:          Record<string, number>;
+  topTags:           { tag: string; count: number }[];
+  topProducts:       { name: string; count: number; avgSentiment?: string }[];
+  recentSummaries:   string[];                 // last 10 AI summaries
+  unanalyzedCount:   number;
+}
+
+export interface StoreInsightsResult {
+  storeHealthScore:     number;   // 0–10
+  executiveSummary:     string;
+  topIssues:            { issue: string; urgency: 'high' | 'medium' | 'low'; recommendation: string }[];
+  customerIntel:        { insight: string; action: string }[];
+  revenueRisks:         { risk: string; magnitude: 'high' | 'medium' | 'low'; mitigation: string }[];
+  opportunities:        { opportunity: string; potentialImpact: string }[];
+  priorityActions:      { rank: number; action: string; rationale: string }[];
+}
+
+const INSIGHTS_SYSTEM_PROMPT = `You are a senior marketing strategist and customer success expert analysing support ticket data for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
+
+Your role: turn raw support data into sharp, boardroom-ready insights. Think like a CMO reviewing the support queue — what does this data tell us about the health of the business, customer satisfaction, revenue risk, and growth opportunities?
+
+You will receive aggregate statistics from the support ticket system including ticket volumes, customer sentiment, archetypes, refund/churn risk, top issues, and product patterns.
+
+Return ONLY a JSON object with exactly these fields:
+{
+  "storeHealthScore": <number 0.0 to 10.0 — overall business health based on the data>,
+  "executiveSummary": "3-4 sentence executive summary of the current state of the business from a customer support perspective.",
+  "topIssues": [
+    { "issue": "...", "urgency": "high|medium|low", "recommendation": "One actionable sentence." }
+  ],
+  "customerIntel": [
+    { "insight": "Key customer behaviour or segment insight.", "action": "What to do about it." }
+  ],
+  "revenueRisks": [
+    { "risk": "...", "magnitude": "high|medium|low", "mitigation": "One sentence mitigation strategy." }
+  ],
+  "opportunities": [
+    { "opportunity": "A growth or retention opportunity visible in the data.", "potentialImpact": "Estimated business impact." }
+  ],
+  "priorityActions": [
+    { "rank": 1, "action": "Most important thing to do right now.", "rationale": "Why this is #1." }
+  ]
+}
+
+Rules:
+- topIssues: 3–5 items, sorted by urgency
+- customerIntel: 3–4 items
+- revenueRisks: 2–4 items
+- opportunities: 3–5 items
+- priorityActions: exactly 5 items (ranked 1–5)
+- Be specific and numbers-driven where possible — cite the data
+- Think like a revenue-focused operator, not a support agent
+- If data is sparse (few tickets), say so in the summary and adjust confidence accordingly
+
+Respond with valid JSON only. No markdown, no code fences.`;
+
+export async function generateStoreInsights(input: StoreInsightsInput): Promise<StoreInsightsResult> {
+  const context = `
+Support Ticket Analytics:
+- Total tickets: ${input.totalTickets} (${input.openTickets} open, ${input.resolvedTickets} resolved)
+- Unanalyzed tickets (no AI data): ${input.unanalyzedCount}
+
+Priority breakdown: ${JSON.stringify(input.priorityBreakdown)}
+Sentiment breakdown: ${JSON.stringify(input.sentimentBreakdown)}
+Customer archetype breakdown: ${JSON.stringify(input.archetypeBreakdown)}
+Refund intent breakdown: ${JSON.stringify(input.refundIntentBreakdown)}
+Churn risk breakdown: ${JSON.stringify(input.churnRiskBreakdown)}
+Lifetime value breakdown: ${JSON.stringify(input.ltvBreakdown)}
+
+Top issue tags (by frequency): ${input.topTags.slice(0, 10).map((t) => `${t.tag} (${t.count})`).join(', ') || 'none'}
+
+Most-mentioned products: ${input.topProducts.slice(0, 8).map((p) => `${p.name} (${p.count} tickets)`).join(', ') || 'none'}
+
+Recent ticket summaries (sample of last 10):
+${input.recentSummaries.slice(0, 10).map((s, i) => `${i + 1}. ${s}`).join('\n') || 'None available'}
+`.trim();
+
+  const raw = await chatCompletion(INSIGHTS_SYSTEM_PROMPT, context, 45_000);
+
+  type Raw = {
+    storeHealthScore?: unknown;
+    executiveSummary?: unknown;
+    topIssues?: unknown;
+    customerIntel?: unknown;
+    revenueRisks?: unknown;
+    opportunities?: unknown;
+    priorityActions?: unknown;
+  };
+  const p = JSON.parse(raw) as Raw;
+
+  return {
+    storeHealthScore:  typeof p.storeHealthScore === 'number' ? Math.min(10, Math.max(0, p.storeHealthScore)) : 5,
+    executiveSummary:  typeof p.executiveSummary === 'string' ? p.executiveSummary : '',
+    topIssues:         Array.isArray(p.topIssues) ? (p.topIssues as {issue:string;urgency:'high'|'medium'|'low';recommendation:string}[]) : [],
+    customerIntel:     Array.isArray(p.customerIntel) ? (p.customerIntel as {insight:string;action:string}[]) : [],
+    revenueRisks:      Array.isArray(p.revenueRisks) ? (p.revenueRisks as {risk:string;magnitude:'high'|'medium'|'low';mitigation:string}[]) : [],
+    opportunities:     Array.isArray(p.opportunities) ? (p.opportunities as {opportunity:string;potentialImpact:string}[]) : [],
+    priorityActions:   Array.isArray(p.priorityActions) ? (p.priorityActions as {rank:number;action:string;rationale:string}[]) : [],
+  };
 }
 
 // ---------------------------------------------------------------------------

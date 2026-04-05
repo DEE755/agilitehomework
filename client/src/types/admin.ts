@@ -26,6 +26,7 @@ export interface Agent {
   email: string;
   role: AgentRole;
   isAiAgent?: boolean;
+  avatarUrl?: string;
 }
 
 export interface InternalNote {
@@ -37,11 +38,11 @@ export interface InternalNote {
 }
 
 export interface AdminTicketSummary extends TicketSummary {
-  assignedTo: Pick<Agent, '_id' | 'name' | 'email' | 'isAiAgent'> | null;
+  assignedTo: Pick<Agent, '_id' | 'name' | 'email' | 'isAiAgent' | 'avatarUrl'> | null;
   aiPriority?: 'low' | 'medium' | 'high' | 'irrelevant' | null;
   aiTriagedAt?: string | null;
   aiAutoAssigned?: boolean;
-  product?: { _id: string; name: string; category: string; imageUrl?: string | null } | null;
+  product?: { _id: string; name: string; category: string; price?: number | null; imageUrl?: string | null } | null;
   // Customer Intelligence (populated when ticket has been analyzed)
   mktArchetype?: string | null;
   mktArchetypeLabel?: string | null;
@@ -57,6 +58,8 @@ export interface AdminTicketProduct {
   name: string;
   category: string;
   sku: string;
+  slug?: string;
+  price?: number | null;
   imageUrl?: string;
 }
 
@@ -162,6 +165,16 @@ export interface AgentActivity {
   stats: AgentActivityStats;
   assignedTickets: AgentActivityTicket[];
   recentReplies: AgentActivityReply[];
+}
+
+export interface StoreInsightsResult {
+  storeHealthScore:  number;
+  executiveSummary:  string;
+  topIssues:         { issue: string; urgency: 'high' | 'medium' | 'low'; recommendation: string }[];
+  customerIntel:     { insight: string; action: string }[];
+  revenueRisks:      { risk: string; magnitude: 'high' | 'medium' | 'low'; mitigation: string }[];
+  opportunities:     { opportunity: string; potentialImpact: string }[];
+  priorityActions:   { rank: number; action: string; rationale: string }[];
 }
 
 export interface CoachMessage {

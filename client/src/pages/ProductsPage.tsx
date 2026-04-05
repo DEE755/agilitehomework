@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProducts } from '../hooks/useProducts';
 import type { Product } from '../types/product';
+import ProductFinderWidget from '../components/ProductFinderWidget';
 
 const CATEGORY_COLORS: Record<string, string> = {
   'Body Armor':     'text-red-400 bg-red-500/10 border-red-500/20',
@@ -74,15 +75,30 @@ function ProductCardSkeleton() {
   );
 }
 
+// ─── Related products (client-side, no AI call) ───────────────────────────────
+
+function getRelated(current: Product, all: Product[], max = 3): Product[] {
+  const others = all.filter((p) => p._id !== current._id);
+  const same  = others.filter((p) => p.category === current.category);
+  const diff  = others.filter((p) => p.category !== current.category);
+  const shuffle = <T,>(arr: T[]) => [...arr].sort(() => Math.random() - 0.5);
+  const picks = shuffle(same).slice(0, 2);
+  picks.push(...shuffle(diff).slice(0, max - picks.length));
+  return picks.slice(0, max);
+}
+
 // ─── Product Detail Modal ─────────────────────────────────────────────────────
 
-function ProductModal({ product, onClose, onGetHelp }: {
+function ProductModal({ product, allProducts, onClose, onGetHelp, onSelect }: {
   product: Product;
+  allProducts: Product[];
   onClose: () => void;
   onGetHelp: (p: Product) => void;
+  onSelect: (p: Product) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [imgErrored, setImgErrored] = useState(false);
+  const related = getRelated(product, allProducts);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
@@ -100,7 +116,7 @@ function ProductModal({ product, onClose, onGetHelp }: {
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
         ref={ref}
-        className="relative z-10 flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl"
+        className="relative z-10 flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl max-h-[90vh] overflow-y-auto"
       >
         {/* Image */}
         <div className="relative h-64 w-full shrink-0 overflow-hidden bg-zinc-800 sm:h-80">
@@ -132,7 +148,12 @@ function ProductModal({ product, onClose, onGetHelp }: {
         {/* Body */}
         <div className="p-6">
           <div className="mb-4 flex items-start justify-between gap-4">
-            <h2 className="text-xl font-bold text-zinc-100">{product.name}</h2>
+            <div>
+              <h2 className="text-xl font-bold text-zinc-100">{product.name}</h2>
+              {product.price != null && (
+                <p className="mt-1 text-lg font-semibold text-olive-400">${product.price}</p>
+              )}
+            </div>
             <span className="shrink-0 font-mono text-[10px] text-zinc-700 mt-1">{product.sku}</span>
           </div>
 
@@ -159,6 +180,33 @@ function ProductModal({ product, onClose, onGetHelp }: {
               Get Help →
             </button>
           </div>
+
+          {/* Goes well with */}
+          {related.length > 0 && (
+            <div className="mt-6 border-t border-zinc-800 pt-5">
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Goes well with</p>
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {related.map((p) => (
+                  <button
+                    key={p._id}
+                    onClick={() => onSelect(p)}
+                    className="flex shrink-0 items-center gap-2.5 rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5 text-left transition hover:border-zinc-700 hover:bg-zinc-800/60"
+                  >
+                    {p.imageUrl ? (
+                      <img src={p.imageUrl} alt={p.name} className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+                    ) : (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-xl text-zinc-700">◈</div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="max-w-[120px] truncate text-xs font-semibold text-zinc-200">{p.name}</p>
+                      <p className="text-[10px] text-zinc-600">{p.category}</p>
+                      {p.price != null && <p className="text-[10px] font-semibold text-olive-400">${p.price}</p>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -174,7 +222,8 @@ type PageSize = typeof PAGE_SIZE_OPTIONS[number] | 'all';
 export default function ProductsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { products, loading, error, reload } = useProducts();
+  const { products: allProducts, loading, error, reload } = useProducts();
+  const products = allProducts.filter((p) => !!p.imageUrl && !p.name.toLowerCase().includes('produ'));
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [pageSize, setPageSize] = useState<PageSize>(8);
@@ -323,7 +372,12 @@ export default function ProductsPage() {
 
               {/* Body */}
               <div className="flex flex-1 flex-col p-5">
-                <h2 className="text-sm font-bold text-zinc-100">{product.name}</h2>
+                <div className="flex items-start justify-between gap-2">
+                  <h2 className="text-sm font-bold text-zinc-100">{product.name}</h2>
+                  {product.price != null && (
+                    <span className="shrink-0 text-sm font-semibold text-olive-400">${product.price}</span>
+                  )}
+                </div>
                 <div className="mt-1.5 flex-1">
                   <p className="text-xs leading-relaxed text-zinc-500">
                     {product.description.length > DESCRIPTION_LIMIT
@@ -360,8 +414,10 @@ export default function ProductsPage() {
       {selectedProduct && (
         <ProductModal
           product={selectedProduct}
+          allProducts={products}
           onClose={() => setSelectedProduct(null)}
           onGetHelp={(p) => { setSelectedProduct(null); openTicket(p); }}
+          onSelect={(p) => setSelectedProduct(p)}
         />
       )}
 
@@ -371,7 +427,7 @@ export default function ProductsPage() {
           <p className="text-xs text-zinc-600">
             {(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filtered.length)} of {filtered.length}
           </p>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={safePage === 1}
@@ -379,19 +435,7 @@ export default function ProductsPage() {
             >
               ← Prev
             </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-              <button
-                key={n}
-                onClick={() => setPage(n)}
-                className={`rounded border px-3 py-1.5 text-xs font-medium transition ${
-                  n === safePage
-                    ? 'border-olive-500/40 bg-olive-500/15 text-olive-400'
-                    : 'border-zinc-800 text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
+            <span className="text-xs text-zinc-500">{safePage} / {totalPages}</span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage === totalPages}
@@ -402,6 +446,11 @@ export default function ProductsPage() {
           </div>
         </div>
       )}
+
+      <ProductFinderWidget
+        products={products}
+        onSelectProduct={(p) => setSelectedProduct(p)}
+      />
     </div>
   );
 }

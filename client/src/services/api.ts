@@ -35,10 +35,27 @@ export type TicketFilters = {
   limit?: number;
 };
 
+export interface FinderMessage { role: 'user' | 'assistant'; content: string; }
+export interface FinderProfile {
+  useCase: string | null; experienceLevel: string | null;
+  budget: string | null; environment: string | null; notes: string | null;
+}
+export interface FinderResponse {
+  message: string; quickReplies: string[];
+  phase: 'questioning' | 'recommending' | 'following_up';
+  recommendations: string[]; profile: FinderProfile;
+}
+
 export const api = {
   products: {
     list(): Promise<{ data: Product[] }> {
       return request('/products');
+    },
+  },
+
+  finder: {
+    chat(input: { history: FinderMessage[]; email?: string }): Promise<{ data: FinderResponse }> {
+      return request('/ai/finder', { method: 'POST', body: JSON.stringify(input) });
     },
   },
 

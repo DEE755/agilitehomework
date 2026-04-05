@@ -7,6 +7,7 @@ export interface IUser {
   role: AgentRole;
   isAiAgent?: boolean;
   mustChangePassword?: boolean;
+  avatarKey?: string;
 }
 
 export interface JwtPayload {

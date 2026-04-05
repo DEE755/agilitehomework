@@ -92,27 +92,33 @@ function NoteBubble({ note }: { note: InternalNote }) {
 }
 
 function ProductCard({ product }: { product: AdminTicketProduct }) {
+  const inner = (
+    <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3 transition hover:border-zinc-700 hover:bg-zinc-900/60">
+      {product.imageUrl ? (
+        <img src={product.imageUrl} alt={product.name} className="h-14 w-14 shrink-0 rounded-md object-cover" />
+      ) : (
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-xl text-zinc-700">☐</div>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-zinc-200">{product.name}</p>
+        <p className="text-xs text-zinc-500">{product.category}</p>
+        {product.price != null && <p className="mt-0.5 text-xs font-semibold text-olive-400">${product.price}</p>}
+        <p className="mt-0.5 font-mono text-[10px] text-zinc-700">{product.sku}</p>
+      </div>
+      {product.slug && (
+        <span className="shrink-0 text-[10px] text-zinc-600 group-hover:text-zinc-400">View →</span>
+      )}
+    </div>
+  );
+
   return (
     <div className="mt-5 border-t border-zinc-800 pt-5">
       <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Related Product</p>
-      <div className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-        {product.imageUrl ? (
-          <img
-            src={product.imageUrl}
-            alt={product.name}
-            className="h-14 w-14 shrink-0 rounded-md object-cover"
-          />
-        ) : (
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-xl text-zinc-700">
-            ☐
-          </div>
-        )}
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-zinc-200">{product.name}</p>
-          <p className="text-xs text-zinc-500">{product.category}</p>
-          <p className="mt-0.5 font-mono text-[10px] text-zinc-700">{product.sku}</p>
-        </div>
-      </div>
+      {product.slug ? (
+        <Link to={`/products?product=${product.slug}`} target="_blank" className="group block">
+          {inner}
+        </Link>
+      ) : inner}
     </div>
   );
 }

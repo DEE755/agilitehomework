@@ -13,6 +13,7 @@ import type {
   RemarketingPitchResult,
   CoachMessage,
   AppNotification,
+  StoreInsightsResult,
 } from '../types/admin';
 import type { InternalNote } from '../types/admin';
 import type { Reply, TicketStatus, TicketPriority } from '../types/ticket';
@@ -27,6 +28,7 @@ export interface StoredAgent {
   email: string;
   role: string;
   mustChangePassword?: boolean;
+  avatarUrl?: string;
 }
 
 export function getStoredAgent(): StoredAgent | null {
@@ -159,6 +161,22 @@ export const adminApi = {
 
   changePassword(data: { currentPassword: string; newPassword: string }): Promise<{ data: { ok: boolean } }> {
     return req('/profile/password', { method: 'PATCH', body: JSON.stringify(data) });
+  },
+
+  presignAvatar(contentType: string): Promise<{ data: { uploadUrl: string; key: string; expiresIn: number } }> {
+    return req('/profile/avatar/presign', { method: 'POST', body: JSON.stringify({ contentType }) });
+  },
+
+  updateProfile(data: { avatarKey?: string }): Promise<{ data: { avatarUrl?: string } }> {
+    return req('/profile', { method: 'PATCH', body: JSON.stringify(data) });
+  },
+
+  aiInsights(refresh = false): Promise<{ data: StoreInsightsResult; generatedAt: string; cached: boolean }> {
+    return req(`/ai-insights${refresh ? '?refresh=true' : ''}`);
+  },
+
+  emailAiInsights(): Promise<{ data: { sent: boolean } }> {
+    return req('/ai-insights/email', { method: 'POST' });
   },
 
   deleteAgent(id: string): Promise<{ data: { deleted: boolean } }> {

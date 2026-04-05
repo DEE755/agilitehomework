@@ -27,6 +27,9 @@ async function main() {
   await mongoose.connect(uri);
   console.log('Connected to MongoDB');
 
+  // Deactivate everything first, then activate only the canonical catalog
+  await Product.updateMany({}, { $set: { isActive: false } });
+
   const operations = defaultProducts.map((product) => ({
     updateOne: {
       filter: { slug: product.slug },

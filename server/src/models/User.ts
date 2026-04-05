@@ -17,6 +17,7 @@ const userSchema = new Schema<UserDocument>(
     },
     isAiAgent:          { type: Boolean, default: false },
     mustChangePassword: { type: Boolean, default: false },
+    avatarKey:          { type: String, default: null },
   },
   { timestamps: true },
 );

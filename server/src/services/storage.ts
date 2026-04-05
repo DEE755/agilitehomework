@@ -235,6 +235,21 @@ export async function createTicketImageUpload(input: {
   };
 }
 
+export async function createAvatarUpload(agentId: string, contentType: string) {
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(contentType)) {
+    throw new Error('Only GIF, JPG, PNG, and WEBP images are allowed');
+  }
+  const ext = contentType === 'image/gif' ? '.gif' : contentType === 'image/png' ? '.png' : contentType === 'image/webp' ? '.webp' : '.jpg';
+  const key = `avatars/${agentId}${ext}`;
+  const config = getStorageConfig();
+  const uploadUrl = await getSignedUrl(
+    getS3Client(),
+    new PutObjectCommand({ Bucket: config.bucket, Key: key, ContentType: contentType }),
+    { expiresIn: config.uploadUrlTtlSeconds },
+  );
+  return { uploadUrl, key, expiresIn: config.uploadUrlTtlSeconds };
+}
+
 async function getAttachmentReadUrl(key: string): Promise<string> {
   const config = getStorageConfig();
 

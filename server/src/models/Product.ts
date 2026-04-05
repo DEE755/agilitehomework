@@ -10,6 +10,7 @@ const productSchema = new Schema<ProductDocument>(
     category:    { type: String, required: true, trim: true },
     description: { type: String, required: true, trim: true },
     sku:         { type: String, required: true, trim: true, uppercase: true, unique: true },
+    price:       { type: Number, default: null },
     imageKey:    { type: String, default: null },
     sortOrder:   { type: Number, default: 0 },
     isActive:    { type: Boolean, default: true },

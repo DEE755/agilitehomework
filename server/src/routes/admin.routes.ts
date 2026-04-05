@@ -22,6 +22,10 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
   changePassword,
+  presignAvatarUpload,
+  updateProfile,
+  getAiInsights,
+  emailAiInsights,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -45,8 +49,12 @@ router.get('/agents/:agentId/activity', getAgentActivity);
 router.get('/tags',                listTags);
 router.get('/products',            listAdminProducts);
 router.get('/settings',            getSettings);
+router.get('/ai-insights',         getAiInsights);
+router.post('/ai-insights/email',  emailAiInsights);
 router.patch('/settings',          updateSettings);
 router.patch('/profile/password',                     changePassword);
+router.patch('/profile',                              updateProfile);
+router.post('/profile/avatar/presign',                presignAvatarUpload);
 router.get('/notifications',                          listNotifications);
 router.patch('/notifications/read-all',               markAllNotificationsRead);
 router.patch('/notifications/:notificationId/read',   markNotificationRead);
