@@ -1,0 +1,77 @@
+import { Link, useLocation, useParams } from 'react-router-dom';
+
+type SuccessState = {
+  authorEmail?: string;
+  productName?: string | null;
+};
+
+export default function SupportSuccessPage() {
+  const { ticketId } = useParams<{ ticketId: string }>();
+  const location = useLocation();
+  const state = (location.state as SuccessState | null) ?? null;
+
+  return (
+    <div className="mx-auto max-w-2xl">
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-8">
+        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-olive-500/30 bg-olive-500/10 text-xl text-olive-400">
+          ✓
+        </span>
+
+        <p className="mt-6 text-[10px] font-semibold uppercase tracking-[0.3em] text-olive-500">
+          Request Received
+        </p>
+        <h1 className="mt-2 text-3xl font-bold text-zinc-100">
+          Your support request is in the queue
+        </h1>
+        <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">
+          The support team now owns the ticket workflow. They will review the request, update its
+          status internally, and reply by email if they need more information.
+        </p>
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+              Reference
+            </p>
+            <p className="mt-2 break-all font-mono text-sm text-zinc-200">
+              {ticketId ?? 'Pending'}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+              Contact
+            </p>
+            <p className="mt-2 text-sm text-zinc-200">
+              {state?.authorEmail ?? 'We will use the email you submitted.'}
+            </p>
+          </div>
+        </div>
+
+        {state?.productName && (
+          <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+              Product
+            </p>
+            <p className="mt-2 text-sm text-zinc-200">{state.productName}</p>
+          </div>
+        )}
+
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <Link
+            to="/products"
+            className="rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-zinc-300 transition hover:border-zinc-700 hover:text-white"
+          >
+            Back to Products
+          </Link>
+          <Link
+            to="/support/new"
+            className="rounded-lg border border-olive-500/40 bg-olive-500/15 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-olive-400 transition hover:bg-olive-500/25"
+          >
+            Open Another Request
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
