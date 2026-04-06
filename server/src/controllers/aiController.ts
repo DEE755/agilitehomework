@@ -57,13 +57,16 @@ export async function triageTicketHandler(req: Request, res: Response): Promise<
 
 // POST /api/ai/suggest-reply
 export async function suggestReplyHandler(req: Request, res: Response): Promise<void> {
-  const { subject, message, productTitle, productCategory, summary, agentDraft } = req.body as {
+  const { subject, message, productTitle, productCategory, productDescription, summary, agentDraft, goal, conversationHistory } = req.body as {
     subject?: unknown;
     message?: unknown;
     productTitle?: unknown;
     productCategory?: unknown;
+    productDescription?: unknown;
     summary?: unknown;
     agentDraft?: unknown;
+    goal?: unknown;
+    conversationHistory?: unknown;
   };
 
   if (typeof subject !== 'string' || !subject.trim()) {
@@ -76,13 +79,22 @@ export async function suggestReplyHandler(req: Request, res: Response): Promise<
   }
 
   try {
+    const history = Array.isArray(conversationHistory)
+      ? (conversationHistory as { role?: unknown; body?: unknown }[])
+          .filter((m) => (m.role === 'customer' || m.role === 'agent') && typeof m.body === 'string')
+          .map((m) => ({ role: m.role as 'customer' | 'agent', body: m.body as string }))
+      : undefined;
+
     const result = await suggestReply({
-      subject:         subject.trim(),
-      message:         message.trim(),
-      productTitle:    typeof productTitle    === 'string' ? productTitle.trim()    : undefined,
-      productCategory: typeof productCategory === 'string' ? productCategory.trim() : undefined,
-      summary:         typeof summary         === 'string' ? summary.trim()         : undefined,
-      agentDraft:      typeof agentDraft      === 'string' ? agentDraft.trim()      : undefined,
+      subject:             subject.trim(),
+      message:             message.trim(),
+      productTitle:        typeof productTitle        === 'string' ? productTitle.trim()        : undefined,
+      productCategory:     typeof productCategory     === 'string' ? productCategory.trim()     : undefined,
+      productDescription:  typeof productDescription  === 'string' ? productDescription.trim()  : undefined,
+      summary:             typeof summary             === 'string' ? summary.trim()             : undefined,
+      agentDraft:          typeof agentDraft          === 'string' ? agentDraft.trim()          : undefined,
+      goal:                typeof goal                === 'string' ? goal.trim()                : undefined,
+      conversationHistory: history,
     });
 
     res.json({ data: result });

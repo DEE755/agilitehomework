@@ -330,6 +330,76 @@ const SENTIMENT_META: Record<string, { icon: string; color: string }> = {
   hostile:    { icon: '😠', color: 'text-red-400' },
 };
 
+// ─── Reply Goal Modal ─────────────────────────────────────────────────────────
+
+const REPLY_GOALS = [
+  { id: 'retention',     label: 'Customer Retention',   icon: '🤝', desc: 'Preserve the relationship and prevent churn',              color: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-300 hover:bg-emerald-500/10' },
+  { id: 'satisfaction',  label: 'Satisfaction Recovery', icon: '⭐', desc: 'Turn a negative experience into a resolved, positive one', color: 'border-sky-500/30 bg-sky-500/5 text-sky-300 hover:bg-sky-500/10' },
+  { id: 'deescalation',  label: 'De-escalation',         icon: '🕊️', desc: 'Defuse emotional tension before addressing the core issue', color: 'border-amber-500/30 bg-amber-500/5 text-amber-300 hover:bg-amber-500/10' },
+  { id: 'negotiation',   label: 'Dispute Negotiation',   icon: '⚖️', desc: 'Navigate refund or compensation toward a mutual outcome',  color: 'border-red-500/30 bg-red-500/5 text-red-300 hover:bg-red-500/10' },
+] as const;
+
+function ReplyGoalModal({ open, onClose, onSelect, hasTyped }: {
+  open: boolean;
+  onClose: () => void;
+  onSelect: (goal?: string) => void;
+  hasTyped: boolean;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl">
+        <div className="border-b border-zinc-800 px-6 py-4">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-violet-500/30 bg-violet-500/10 text-xs font-bold text-violet-400">✦</span>
+            <div>
+              <p className="text-sm font-semibold text-zinc-100">
+                {hasTyped ? 'How should the AI improve your draft?' : 'What\'s the goal of this reply?'}
+              </p>
+              <p className="text-[10px] text-zinc-600">The AI will tailor the reply to your chosen objective</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 space-y-2">
+          {/* Automatic — top option */}
+          <button
+            onClick={() => { onSelect(undefined); onClose(); }}
+            className="flex w-full items-start gap-3 rounded-xl border border-violet-500/40 bg-violet-500/10 px-4 py-3 text-left transition hover:bg-violet-500/15"
+          >
+            <span className="mt-px shrink-0 text-base">⚡</span>
+            <div>
+              <p className="text-xs font-semibold text-violet-300">Automatic</p>
+              <p className="text-[10px] text-zinc-500">AI picks the best angle based on ticket context</p>
+            </div>
+          </button>
+
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            {REPLY_GOALS.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => { onSelect(`${g.label}: ${g.desc}`); onClose(); }}
+                className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-left text-xs transition ${g.color}`}
+              >
+                <span className="mt-px shrink-0">{g.icon}</span>
+                <div>
+                  <p className="font-semibold leading-tight">{g.label}</p>
+                  <p className="mt-0.5 text-[10px] opacity-60 leading-snug">{g.desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-zinc-800 px-6 py-3">
+          <button onClick={onClose} className="text-[11px] text-zinc-600 transition hover:text-zinc-400">Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Agent Coach ─────────────────────────────────────────────────────────────
 
 const COACH_INTENTIONS = [
@@ -1102,6 +1172,7 @@ export default function AdminTicketDetailPage() {
   const [aiError,       setAiError]       = useState<string | null>(null);
   const [suggestResult, setSuggestResult] = useState<AiSuggestReplyResult | null>(null);
   const [suggesting,    setSuggesting]    = useState(false);
+  const [goalModalOpen, setGoalModalOpen] = useState(false);
 
   // Coach
   const [coachOpen,    setCoachOpen]    = useState(false);
@@ -1285,17 +1356,24 @@ export default function AdminTicketDetailPage() {
     }
   }
 
-  async function handleSuggestReply() {
+  async function handleSuggestReply(goal?: string) {
     if (!ticket) return;
     setSuggesting(true);
+    const conversationHistory = ticket.replies.map((r) => ({
+      role: r.isAgent ? 'agent' as const : 'customer' as const,
+      body: r.body,
+    }));
     try {
       const { data } = await adminApi.ai.suggestReply({
-        subject:         ticket.title,
-        message:         ticket.description,
-        productTitle:    ticket.product?.name,
-        productCategory: ticket.product?.category,
-        summary:         ticket.aiSummary ?? undefined,
-        agentDraft:      replyBody.trim() || undefined,
+        subject:             ticket.title,
+        message:             ticket.description,
+        productTitle:        ticket.product?.name,
+        productCategory:     ticket.product?.category,
+        productDescription:  ticket.product?.description ?? undefined,
+        summary:             ticket.aiSummary ?? undefined,
+        agentDraft:          replyBody.trim() || undefined,
+        goal,
+        conversationHistory: conversationHistory.length ? conversationHistory : undefined,
       });
       setSuggestResult(data);
       setReplyBody(data.suggestedReply);
@@ -1426,7 +1504,7 @@ export default function AdminTicketDetailPage() {
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-olive-600">Reply to Customer</p>
                 <button
                   type="button"
-                  onClick={() => void handleSuggestReply()}
+                  onClick={() => setGoalModalOpen(true)}
                   disabled={suggesting}
                   className="flex items-center gap-1.5 rounded border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-400 transition hover:bg-violet-500/20 disabled:opacity-40"
                 >
@@ -1775,6 +1853,12 @@ export default function AdminTicketDetailPage() {
         ticket={ticket}
         profile={coachProfile}
         onUseInReply={(text) => setReplyBody((prev) => prev ? prev + '\n\n' + text : text)}
+      />
+      <ReplyGoalModal
+        open={goalModalOpen}
+        onClose={() => setGoalModalOpen(false)}
+        hasTyped={!!replyBody.trim()}
+        onSelect={(goal) => { void handleSuggestReply(goal); }}
       />
     </div>
   );

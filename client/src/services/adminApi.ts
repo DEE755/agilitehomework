@@ -236,8 +236,11 @@ export const adminApi = {
       message: string;
       productTitle?: string;
       productCategory?: string;
+      productDescription?: string;
       summary?: string;
       agentDraft?: string;
+      goal?: string;
+      conversationHistory?: { role: 'customer' | 'agent'; body: string }[];
     }): Promise<{ data: AiSuggestReplyResult }> {
       return aiReq('/suggest-reply', input);
     },

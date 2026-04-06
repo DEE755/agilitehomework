@@ -220,14 +220,22 @@ export async function suggestReply(input: {
   message: string;
   productTitle?: string;
   productCategory?: string;
+  productDescription?: string;
   summary?: string;
   agentDraft?: string;
+  goal?: string;
+  conversationHistory?: { role: 'customer' | 'agent'; body: string }[];
 }): Promise<SuggestReplyResult> {
   const context = [
     `Subject: ${input.subject}`,
     input.productTitle ? `Product: ${input.productTitle}${input.productCategory ? ` (${input.productCategory})` : ''}` : null,
+    input.productDescription ? `Product description: ${input.productDescription}` : null,
     input.summary ? `Issue summary: ${input.summary}` : null,
-    `\nCustomer message:\n${input.message}`,
+    `\nOriginal customer message:\n${input.message}`,
+    input.conversationHistory && input.conversationHistory.length > 0
+      ? `\nConversation so far:\n${input.conversationHistory.map((m) => `[${m.role === 'customer' ? 'Customer' : 'Agent'}]: ${m.body}`).join('\n')}`
+      : null,
+    input.goal ? `\nReply objective: ${input.goal} — craft the reply specifically to achieve this goal.` : null,
     input.agentDraft
       ? `\nThe agent has already written a draft reply. Improve it — make it clearer, more professional, and more complete while fully preserving the agent's intent and facts:\n\nAgent draft:\n${input.agentDraft}`
       : null,
