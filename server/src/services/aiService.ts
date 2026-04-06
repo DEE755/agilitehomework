@@ -1172,9 +1172,9 @@ You are speaking with: ${ctx.senderName}
   }));
   messages.push({ role: 'user', content: [{ text: ctx.currentMessage }] });
 
-  return logfire.span('ai_agent_chat_reply', async () =>
-    chatRaw(`${AI_AGENT_SYSTEM_PROMPT}\n\n${contextBlock}`, messages, 30_000),
-  );
+  return logfire.span('ai_agent_chat_reply', {
+    callback: async () => chatRaw(`${AI_AGENT_SYSTEM_PROMPT}\n\n${contextBlock}`, messages, 30_000),
+  });
 }
 
 // ---------------------------------------------------------------------------
