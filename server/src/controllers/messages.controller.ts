@@ -3,19 +3,17 @@ import { Types } from 'mongoose';
 import { AgentMessage } from '../models/AgentMessage';
 import { User } from '../models/User';
 
-type AuthReq = Request & { user?: { _id: string; role: string } };
-
 // ── GET /admin/messages/unread-count ─────────────────────────────────────────
-export async function getUnreadCount(req: AuthReq, res: Response) {
-  const myId = new Types.ObjectId(req.user!._id);
+export async function getUnreadCount(req: Request, res: Response) {
+  const myId = new Types.ObjectId(req.agent!._id);
   const count = await AgentMessage.countDocuments({ toId: myId, readAt: null });
   return res.json({ data: { count } });
 }
 
 // ── GET /admin/messages/conversations ────────────────────────────────────────
 // Returns one entry per unique conversation partner (latest message + unread count).
-export async function listConversations(req: AuthReq, res: Response) {
-  const myId = new Types.ObjectId(req.user!._id);
+export async function listConversations(req: Request, res: Response) {
+  const myId = new Types.ObjectId(req.agent!._id);
 
   const rows = await AgentMessage.aggregate([
     { $match: { $or: [{ fromId: myId }, { toId: myId }] } },
@@ -66,8 +64,8 @@ export async function listConversations(req: AuthReq, res: Response) {
 
 // ── GET /admin/messages/conversations/:agentId ───────────────────────────────
 // Returns full thread + marks incoming messages as read.
-export async function getConversation(req: AuthReq, res: Response) {
-  const myId      = new Types.ObjectId(req.user!._id);
+export async function getConversation(req: Request, res: Response) {
+  const myId      = new Types.ObjectId(req.agent!._id);
   const partnerId = new Types.ObjectId(req.params.agentId);
 
   const messages = await AgentMessage.find({
@@ -109,8 +107,8 @@ export async function getConversation(req: AuthReq, res: Response) {
 }
 
 // ── POST /admin/messages ─────────────────────────────────────────────────────
-export async function sendMessage(req: AuthReq, res: Response) {
-  const myId = new Types.ObjectId(req.user!._id);
+export async function sendMessage(req: Request, res: Response) {
+  const myId = new Types.ObjectId(req.agent!._id);
   const { toId, body, ticketRefs = [], productRefs = [] } = req.body as {
     toId:        string;
     body:        string;
