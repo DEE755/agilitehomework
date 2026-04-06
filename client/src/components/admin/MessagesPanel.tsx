@@ -8,6 +8,7 @@ import type {
   AgentMessageProductRef,
   Agent,
   AdminProduct,
+  AdminTicket,
   AdminTicketSummary,
 } from '../../types/admin';
 
@@ -282,66 +283,243 @@ function ProductPicker({
 
 // ── Message bubble ────────────────────────────────────────────────────────────
 
-function MessageBubble({ msg, isMine }: { msg: AgentMessage; isMine: boolean }) {
+// ── Preview cards ─────────────────────────────────────────────────────────────
+
+const PRIORITY_CLS: Record<string, string> = {
+  high:       'text-red-400 border-red-500/30 bg-red-500/10',
+  medium:     'text-amber-400 border-amber-500/30 bg-amber-500/10',
+  low:        'text-zinc-400 border-zinc-600 bg-zinc-800',
+  irrelevant: 'text-zinc-500 border-zinc-700 bg-zinc-900',
+};
+
+function TicketPreview({ ticketId, onClose }: { ticketId: string; onClose: () => void }) {
+  const [ticket, setTicket] = useState<AdminTicket | null>(null);
+  const [loading, setLoading] = useState(true);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    adminApi.tickets.get(ticketId).then((r) => setTicket(r.data)).catch(() => null).finally(() => setLoading(false));
+  }, [ticketId]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   return (
-    <div className={`flex gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
-      <div className={`flex flex-col gap-1 max-w-[75%] ${isMine ? 'items-end' : 'items-start'}`}>
-        {/* Body */}
-        <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
-          isMine
-            ? 'bg-olive-500/20 text-olive-100 rounded-tr-sm'
-            : 'bg-zinc-800 text-zinc-100 rounded-tl-sm'
-        }`}>
-          {msg.body}
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+      onClick={(e) => { if (cardRef.current && !cardRef.current.contains(e.target as Node)) onClose(); }}
+    >
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div ref={cardRef} className="relative z-10 w-full max-w-lg rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl overflow-hidden">
+        <div className="flex items-start justify-between gap-3 border-b border-zinc-800 px-5 py-4">
+          {loading
+            ? <div className="h-4 w-48 rounded bg-zinc-800 animate-pulse" />
+            : <h3 className="font-semibold text-zinc-100 leading-snug">{ticket?.title}</h3>
+          }
+          <button onClick={onClose} className="shrink-0 text-zinc-500 hover:text-zinc-300 transition">✕</button>
         </div>
 
-        {/* Ticket refs */}
-        {msg.ticketRefs.length > 0 && (
-          <div className="flex flex-col gap-1 w-full">
-            {msg.ticketRefs.map((r) => (
-              <Link
-                key={r.ticketId}
-                to={`/admin/tickets/${r.ticketId}`}
-                className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 transition hover:border-zinc-600 hover:bg-zinc-800"
-              >
-                <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3 shrink-0 text-zinc-500">
-                  <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.3"/>
-                  <path d="M5 6h6M5 9h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                </svg>
-                <span className="text-[11px] text-zinc-300 line-clamp-1 flex-1">{r.title}</span>
-                <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase ${STATUS_COLORS[r.status] ?? 'bg-zinc-700 text-zinc-400 border-zinc-600'}`}>
-                  {r.status.replace('_', ' ')}
+        {loading ? (
+          <div className="p-5 space-y-3">
+            {[80, 55, 90, 40].map((w, i) => (
+              <div key={i} className="h-3 rounded bg-zinc-800 animate-pulse" style={{ width: `${w}%` }} />
+            ))}
+          </div>
+        ) : ticket ? (
+          <div className="p-5 space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded border px-2 py-0.5 text-[10px] font-semibold uppercase whitespace-nowrap ${STATUS_COLORS[ticket.status] ?? 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
+                {ticket.status.replace('_', ' ')}
+              </span>
+              {ticket.aiPriority && (
+                <span className={`rounded border px-2 py-0.5 text-[10px] font-semibold uppercase whitespace-nowrap ${PRIORITY_CLS[ticket.aiPriority] ?? ''}`}>
+                  {ticket.aiPriority} priority
                 </span>
-              </Link>
-            ))}
-          </div>
-        )}
+              )}
+              {ticket.assignedTo && <span className="text-[11px] text-zinc-500">→ {ticket.assignedTo.name}</span>}
+            </div>
 
-        {/* Product refs */}
-        {msg.productRefs.length > 0 && (
-          <div className="flex flex-col gap-1 w-full">
-            {msg.productRefs.map((r) => (
-              <Link
-                key={r.productId}
-                to={r.slug ? `/products?product=${r.slug}` : '/products'}
-                className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-1.5 transition hover:border-amber-500/40 hover:bg-amber-500/10"
-              >
-                <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3 shrink-0 text-amber-500/60">
-                  <path d="M13 5H3L2 13h12L13 5z" stroke="currentColor" strokeWidth="1.3"/>
-                  <path d="M5 5V4a3 3 0 016 0v1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                </svg>
-                <span className="text-[11px] text-amber-400 line-clamp-1 flex-1">{r.name}</span>
-                <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5 shrink-0 text-amber-500/40">
-                  <path d="M2 6h8M7 3l3 3-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </Link>
-            ))}
-          </div>
-        )}
+            {ticket.product && (
+              <div className="flex items-center gap-2.5 rounded-lg border border-zinc-800 bg-zinc-800/40 p-2.5">
+                {ticket.product.imageUrl ? (
+                  <img src={ticket.product.imageUrl} alt={ticket.product.name} className="h-9 w-9 shrink-0 rounded-md object-cover" />
+                ) : (
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-zinc-700 text-xs font-bold text-zinc-400">
+                    {ticket.product.name[0]?.toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs font-semibold text-zinc-200">{ticket.product.name}</p>
+                  {ticket.product.price != null && <p className="text-[10px] text-olive-400">${ticket.product.price}</p>}
+                </div>
+              </div>
+            )}
 
-        <span className="text-[10px] text-zinc-600 px-1">{timeAgo(msg.createdAt)}</span>
+            <div>
+              <p className="mb-1 text-[9px] font-semibold uppercase tracking-widest text-zinc-600">Customer message</p>
+              <p className="text-sm leading-relaxed text-zinc-400 line-clamp-4">{ticket.description}</p>
+            </div>
+
+            <div className="flex items-center justify-between text-[11px] text-zinc-600">
+              <span>{ticket.authorName} · {ticket.authorEmail}</span>
+              <span>{new Date(ticket.createdAt).toLocaleDateString()}</span>
+            </div>
+
+            <Link
+              to={`/admin/tickets/${ticket._id}`}
+              onClick={onClose}
+              className="flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-xs font-semibold text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100"
+            >
+              Open full ticket
+              <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5"><path d="M2 6h8M7 3l3 3-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </Link>
+          </div>
+        ) : (
+          <p className="p-5 text-sm text-zinc-500">Ticket not found.</p>
+        )}
       </div>
     </div>
+  );
+}
+
+function ProductPreview({ productRef, onClose }: { productRef: AgentMessageProductRef; onClose: () => void }) {
+  const [product, setProduct] = useState<AdminProduct | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    adminApi.products().then((r) => {
+      setProduct(r.data.find((p) => p._id === productRef.productId) ?? null);
+    }).catch(() => null);
+  }, [productRef.productId]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const name = product?.name ?? productRef.name;
+  const imageUrl = product?.imageUrl ?? productRef.imageUrl;
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+      onClick={(e) => { if (cardRef.current && !cardRef.current.contains(e.target as Node)) onClose(); }}
+    >
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div ref={cardRef} className="relative z-10 w-full max-w-md rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl overflow-hidden">
+        <div className="relative h-40 w-full bg-zinc-800 shrink-0">
+          {imageUrl ? (
+            <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <span className="select-none text-5xl font-bold text-zinc-600">{name[0]?.toUpperCase()}</span>
+            </div>
+          )}
+          {product?.category && (
+            <span className="absolute bottom-2.5 left-2.5 rounded-full border border-zinc-600/50 bg-zinc-900/80 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-300 backdrop-blur-sm">
+              {product.category}
+            </span>
+          )}
+          <button onClick={onClose} className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900/80 text-zinc-400 backdrop-blur-sm transition hover:text-zinc-100">✕</button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="font-semibold text-zinc-100">{name}</h3>
+            {product?.price != null && <span className="shrink-0 font-semibold text-olive-400">${product.price}</span>}
+          </div>
+          {product?.description && (
+            <p className="text-sm leading-relaxed text-zinc-400 line-clamp-3">{product.description}</p>
+          )}
+          {productRef.slug && (
+            <Link
+              to={`/products?product=${productRef.slug}`}
+              onClick={onClose}
+              className="flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-xs font-semibold text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100"
+            >
+              View in store
+              <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5"><path d="M2 6h8M7 3l3 3-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MessageBubble({ msg, isMine }: { msg: AgentMessage; isMine: boolean }) {
+  const [previewTicketId, setPreviewTicketId]   = useState<string | null>(null);
+  const [previewProduct,  setPreviewProduct]    = useState<AgentMessageProductRef | null>(null);
+
+  return (
+    <>
+      <div className={`flex gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
+        <div className={`flex flex-col gap-1 max-w-[75%] ${isMine ? 'items-end' : 'items-start'}`}>
+          {/* Body */}
+          <div className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
+            isMine
+              ? 'bg-olive-500/20 text-olive-100 rounded-tr-sm'
+              : 'bg-zinc-800 text-zinc-100 rounded-tl-sm'
+          }`}>
+            {msg.body}
+          </div>
+
+          {/* Ticket refs */}
+          {msg.ticketRefs.length > 0 && (
+            <div className="flex flex-col gap-1 w-full">
+              {msg.ticketRefs.map((r) => (
+                <button
+                  key={r.ticketId}
+                  onClick={() => setPreviewTicketId(r.ticketId)}
+                  className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-left transition hover:border-zinc-600 hover:bg-zinc-800"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3 shrink-0 text-zinc-500">
+                    <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.3"/>
+                    <path d="M5 6h6M5 9h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
+                  <span className="text-[11px] text-zinc-300 line-clamp-1 flex-1">{r.title}</span>
+                  <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase whitespace-nowrap ${STATUS_COLORS[r.status] ?? 'bg-zinc-700 text-zinc-400 border-zinc-600'}`}>
+                    {r.status.replace('_', ' ')}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Product refs */}
+          {msg.productRefs.length > 0 && (
+            <div className="flex flex-col gap-1 w-full">
+              {msg.productRefs.map((r) => (
+                <button
+                  key={r.productId}
+                  onClick={() => setPreviewProduct(r)}
+                  className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-1.5 text-left transition hover:border-amber-500/40 hover:bg-amber-500/10"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3 shrink-0 text-amber-500/60">
+                    <path d="M13 5H3L2 13h12L13 5z" stroke="currentColor" strokeWidth="1.3"/>
+                    <path d="M5 5V4a3 3 0 016 0v1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
+                  <span className="text-[11px] text-amber-400 line-clamp-1 flex-1">{r.name}</span>
+                  <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5 shrink-0 text-amber-500/40">
+                    <path d="M2 6h8M7 3l3 3-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <span className="text-[10px] text-zinc-600 px-1">{timeAgo(msg.createdAt)}</span>
+        </div>
+      </div>
+
+      {previewTicketId && <TicketPreview ticketId={previewTicketId} onClose={() => setPreviewTicketId(null)} />}
+      {previewProduct  && <ProductPreview productRef={previewProduct}  onClose={() => setPreviewProduct(null)} />}
+    </>
   );
 }
 
