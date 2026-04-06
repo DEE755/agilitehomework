@@ -164,8 +164,8 @@ export default function SettingsPanel({ open, onClose }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-600">Workspace</p>
-            <h2 className="text-sm font-bold text-zinc-100">Settings</h2>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-600">Platform-wide</p>
+            <h2 className="text-sm font-bold text-zinc-100">Store Configuration</h2>
           </div>
           <button
             onClick={onClose}
@@ -328,7 +328,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
         {/* Footer */}
         <div className="border-t border-zinc-800 px-5 py-4">
           <p className="text-[10px] text-zinc-700">
-            Theme changes go live immediately. AI settings take effect on new tickets.
+            Changes here affect all customers and agents across the entire store.
           </p>
         </div>
       </div>

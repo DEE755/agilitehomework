@@ -362,16 +362,16 @@ export default function AdminLayout() {
               AI Insights
             </button>
             <NotificationBell />
-            <button
+            {agent?.role === 'admin' && <button
               onClick={() => setSettingsOpen(true)}
               className="rounded border border-zinc-800 p-1.5 text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300"
-              aria-label="Open settings"
+              aria-label="Store configuration"
             >
               <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
                 <path d="M10 13a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="1.5"/>
                 <path d="M10 2v1.5M10 16.5V18M2 10h1.5M16.5 10H18M4.1 4.1l1.06 1.06M14.84 14.84l1.06 1.06M4.1 15.9l1.06-1.06M14.84 5.16l1.06-1.06" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
-            </button>
+            </button>}
 
             {/* Agent identity — click to open profile panel */}
             <button

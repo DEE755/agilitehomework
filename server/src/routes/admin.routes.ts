@@ -48,10 +48,10 @@ router.post('/agents/:agentId/resend-invite',  requireRole('admin'), resendAgent
 router.get('/agents/:agentId/activity', getAgentActivity);
 router.get('/tags',                listTags);
 router.get('/products',            listAdminProducts);
-router.get('/settings',            getSettings);
+router.get('/settings',            requireRole('admin'), getSettings);
 router.get('/ai-insights',         getAiInsights);
 router.post('/ai-insights/email',  emailAiInsights);
-router.patch('/settings',          updateSettings);
+router.patch('/settings',          requireRole('admin'), updateSettings);
 router.patch('/profile/password',                     changePassword);
 router.patch('/profile',                              updateProfile);
 router.post('/profile/avatar/presign',                presignAvatarUpload);
