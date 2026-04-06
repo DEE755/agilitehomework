@@ -270,9 +270,12 @@ export default function AdminAgentsPage() {
                                 {!isAi && !isSelf && (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); setMsgTarget({ _id: agent._id, name: agent.name, avatarUrl: agent.avatarUrl }); }}
-                                    className="text-[10px] text-zinc-700 transition hover:text-sky-400"
+                                    className="flex items-center justify-center rounded p-0.5 text-zinc-600 transition hover:text-sky-400 hover:bg-sky-500/10"
+                                    title={`Chat with ${agent.name.split(' ')[0]}`}
                                   >
-                                    · Chat
+                                    <svg viewBox="0 0 14 14" fill="none" className="h-3 w-3">
+                                      <path d="M12 7c0 2.8-2.25 5-5 5a4.97 4.97 0 01-2.5-.66L2 12l.66-2.5A4.97 4.97 0 012 7c0-2.8 2.25-5 5-5s5 2.2 5 5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+                                    </svg>
                                   </button>
                                 )}
                               </div>
