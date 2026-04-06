@@ -474,11 +474,18 @@ export default function AdminDashboardPage() {
                         const pp = productName ? productPalette(productName) : null;
                         return (
                           <Link to={`/admin/tickets/${ticket._id}`} className="block">
-                            {/* Product name — full width, always left-aligned */}
-                            {productName && pp && (
-                              <p className={`mb-1 text-[9px] font-bold uppercase tracking-widest ${pp.text}`}>
-                                {productName}{price != null ? ` · $${price}` : ''}
-                              </p>
+                            {/* Product name — uniform colour, category chip alongside */}
+                            {productName && (
+                              <div className="mb-1 flex items-center gap-1.5 flex-wrap">
+                                <p className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">
+                                  {productName}{price != null ? ` · $${price}` : ''}
+                                </p>
+                                {ticket.product?.category && (
+                                  <span className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-px text-[8px] font-semibold uppercase tracking-wide text-zinc-500">
+                                    {ticket.product.category}
+                                  </span>
+                                )}
+                              </div>
                             )}
                             {/* Thumbnail + title row */}
                             <div className="flex items-center gap-3">

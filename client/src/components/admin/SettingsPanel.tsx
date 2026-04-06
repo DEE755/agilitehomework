@@ -28,20 +28,35 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
   );
 }
 
-function SectionHeader({ label, expanded, onToggle }: { label: string; expanded: boolean; onToggle: () => void }) {
+/** Collapsible section header. When collapsed, shows an optional badge to the right of the label. */
+function SectionHeader({
+  label, expanded, onToggle, badge,
+}: {
+  label: string;
+  expanded: boolean;
+  onToggle: () => void;
+  badge?: string;
+}) {
   return (
     <button
       onClick={onToggle}
-      className="flex w-full items-center justify-between rounded-lg px-1 py-0.5 text-left transition hover:bg-zinc-900/60"
+      className="flex w-full items-center justify-between gap-3 rounded-lg px-1 py-0.5 text-left transition hover:bg-zinc-900/60"
     >
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{label}</p>
-      <svg
-        viewBox="0 0 12 12"
-        fill="none"
-        className={`h-3 w-3 shrink-0 text-zinc-600 transition-transform duration-200 ${expanded ? '' : '-rotate-90'}`}
-      >
-        <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
+      <p className="shrink-0 text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{label}</p>
+      <div className="flex min-w-0 items-center gap-2">
+        {!expanded && badge && (
+          <span className="truncate text-[10px] text-zinc-500">
+            Applied: <span className="font-semibold text-zinc-300">{badge}</span>
+          </span>
+        )}
+        <svg
+          viewBox="0 0 12 12"
+          fill="none"
+          className={`h-3 w-3 shrink-0 text-zinc-600 transition-transform duration-200 ${expanded ? '' : '-rotate-90'}`}
+        >
+          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
     </button>
   );
 }
@@ -50,11 +65,13 @@ const JEWISH_THEMES     = THEMES.filter((t) => t.group === 'jewish');
 const COMMERCIAL_THEMES = THEMES.filter((t) => t.group === 'commercial');
 
 export default function SettingsPanel({ open, onClose }: Props) {
-  const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [saving, setSaving]     = useState(false);
-  const [error, setError]       = useState<string | null>(null);
-  const [aiExpanded, setAiExpanded]     = useState(true);
-  const [themesExpanded, setThemesExpanded] = useState(true);
+  const [settings, setSettings]           = useState<AppSettings | null>(null);
+  const [saving, setSaving]               = useState(false);
+  const [error, setError]                 = useState<string | null>(null);
+  const [aiExpanded, setAiExpanded]       = useState(false);
+  const [themesExpanded, setThemesExpanded] = useState(false);
+  // Theme the user clicked but hasn't confirmed yet
+  const [pendingTheme, setPendingTheme]   = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -67,6 +84,11 @@ export default function SettingsPanel({ open, onClose }: Props) {
       .catch((e: Error) => setError(e.message));
   }, [open]);
 
+  // Clear pending selection when section collapses
+  useEffect(() => {
+    if (!themesExpanded) setPendingTheme(null);
+  }, [themesExpanded]);
+
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -76,39 +98,53 @@ export default function SettingsPanel({ open, onClose }: Props) {
 
   async function toggle(key: keyof AppSettings, value: boolean) {
     if (!settings) return;
-    const optimistic = { ...settings, [key]: value };
-    setSettings(optimistic);
+    const prev = settings;
+    setSettings({ ...settings, [key]: value });
     setSaving(true);
     setError(null);
     try {
       const res = await adminApi.settings.update({ [key]: value });
       setSettings(res.data);
     } catch (e) {
-      setSettings(settings);
+      setSettings(prev);
       setError((e as Error).message);
     } finally {
       setSaving(false);
     }
   }
 
-  async function setTheme(themeId: string) {
+  async function applyTheme(themeId: string) {
     if (!settings) return;
+    // Live preview immediately so the admin can see what they confirmed
     applyTheme(themeId);
-    const optimistic = { ...settings, activeTheme: themeId === 'default' ? null : themeId };
-    setSettings(optimistic);
+    const prev = settings;
+    setSettings({ ...settings, activeTheme: themeId === 'default' ? null : themeId });
     setSaving(true);
     setError(null);
     try {
       const res = await adminApi.settings.update({ activeTheme: themeId === 'default' ? null : themeId });
       setSettings(res.data);
     } catch (e) {
+      setSettings(prev);
       setError((e as Error).message);
     } finally {
       setSaving(false);
+      setPendingTheme(null);
     }
   }
 
   const activeTheme = settings?.activeTheme ?? 'default';
+  const activeThemeLabel = activeTheme === 'default'
+    ? 'Default'
+    : `${getTheme(activeTheme).emoji} ${getTheme(activeTheme).name}`;
+
+  function themeChipClass(themeId: string) {
+    const isApplied = activeTheme === themeId;
+    const isPending = pendingTheme === themeId;
+    if (isPending)  return 'border-olive-500/60 bg-olive-500/10 text-zinc-100 ring-1 ring-olive-500/30';
+    if (isApplied)  return 'border-zinc-500 bg-zinc-800 text-zinc-100';
+    return 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200';
+  }
 
   return (
     <>
@@ -143,20 +179,23 @@ export default function SettingsPanel({ open, onClose }: Props) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
           {error && (
             <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
               {error}
             </div>
           )}
 
-          {/* ── AI Settings ──────────────────────────────────────────────── */}
+          {/* ── AI Settings (collapsed by default) ───────────────────────── */}
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
-            <SectionHeader label="AI Settings" expanded={aiExpanded} onToggle={() => setAiExpanded((v) => !v)} />
+            <SectionHeader
+              label="AI Settings"
+              expanded={aiExpanded}
+              onToggle={() => setAiExpanded((v) => !v)}
+            />
 
             {aiExpanded && (
-              <div className="mt-3 space-y-3">
-                {/* Auto-reply */}
+              <div className="mt-3">
                 <div className="flex items-start justify-between gap-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3.5">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-zinc-200">Auto-reply</p>
@@ -180,73 +219,40 @@ export default function SettingsPanel({ open, onClose }: Props) {
             )}
           </div>
 
-          {/* ── Themes ───────────────────────────────────────────────────── */}
+          {/* ── General Website Theme (collapsed by default) ──────────────── */}
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <SectionHeader label="Themes" expanded={themesExpanded} onToggle={() => setThemesExpanded((v) => !v)} />
-              </div>
-              {activeTheme !== 'default' && themesExpanded && (
-                <button
-                  onClick={() => void setTheme('default')}
-                  className="shrink-0 text-[10px] text-zinc-600 transition hover:text-zinc-400"
-                >
-                  Reset
-                </button>
-              )}
-            </div>
+            <SectionHeader
+              label="General Website Theme"
+              expanded={themesExpanded}
+              onToggle={() => setThemesExpanded((v) => !v)}
+              badge={activeThemeLabel}
+            />
 
             {themesExpanded && (
               <div className="mt-3 space-y-4">
-                {/* Active theme preview */}
-                {activeTheme !== 'default' && (() => {
-                  const th = getTheme(activeTheme);
-                  return (
-                    <div
-                      className="overflow-hidden rounded-lg border border-zinc-700"
-                      style={{ background: th.banner?.gradient ?? '#18181b' }}
-                    >
-                      <div className="px-3.5 py-2.5">
-                        <p className="text-[9px] font-semibold uppercase tracking-widest text-white/50">Active</p>
-                        <p className="mt-0.5 text-sm font-bold text-white">
-                          {th.emoji} {th.name}
-                          {th.nameHe && <span className="ms-2 text-white/60">{th.nameHe}</span>}
-                        </p>
-                        {th.banner && (
-                          <p className="mt-0.5 text-[11px] text-white/70 leading-snug">{th.banner.text}</p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
 
                 {/* Holidays */}
                 <div>
                   <p className="mb-2 text-[9px] font-semibold uppercase tracking-widest text-zinc-700">Holidays</p>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {JEWISH_THEMES.map((theme) => {
-                      const isActive = activeTheme === theme.id;
-                      return (
-                        <button
-                          key={theme.id}
-                          onClick={() => void setTheme(theme.id)}
-                          disabled={saving}
-                          className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition disabled:opacity-50 ${
-                            isActive
-                              ? 'border-zinc-500 bg-zinc-800 text-zinc-100'
-                              : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
-                          }`}
-                        >
-                          <span
-                            className="h-2 w-2 shrink-0 rounded-full"
-                            style={{ background: theme.vars['--th-accent'] ?? '#6b7c3a' }}
-                          />
-                          <span className="flex-1 truncate font-medium">{theme.name}</span>
-                          <span className="shrink-0 text-sm">{theme.emoji}</span>
-                          {isActive && <span className="shrink-0 text-[8px] text-zinc-400">●</span>}
-                        </button>
-                      );
-                    })}
+                    {JEWISH_THEMES.map((theme) => (
+                      <button
+                        key={theme.id}
+                        onClick={() => setPendingTheme(pendingTheme === theme.id ? null : theme.id)}
+                        disabled={saving}
+                        className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition disabled:opacity-50 ${themeChipClass(theme.id)}`}
+                      >
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ background: theme.vars['--th-accent'] ?? '#6b7c3a' }}
+                        />
+                        <span className="flex-1 truncate font-medium">{theme.name}</span>
+                        <span className="shrink-0 text-sm">{theme.emoji}</span>
+                        {activeTheme === theme.id && pendingTheme !== theme.id && (
+                          <span className="shrink-0 text-[8px] text-zinc-400">●</span>
+                        )}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -254,31 +260,66 @@ export default function SettingsPanel({ open, onClose }: Props) {
                 <div>
                   <p className="mb-2 text-[9px] font-semibold uppercase tracking-widest text-zinc-700">Commercial</p>
                   <div className="grid grid-cols-2 gap-1.5">
-                    {COMMERCIAL_THEMES.map((theme) => {
-                      const isActive = activeTheme === theme.id;
-                      return (
-                        <button
-                          key={theme.id}
-                          onClick={() => void setTheme(theme.id)}
-                          disabled={saving}
-                          className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition disabled:opacity-50 ${
-                            isActive
-                              ? 'border-zinc-500 bg-zinc-800 text-zinc-100'
-                              : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
-                          }`}
-                        >
-                          <span
-                            className="h-2 w-2 shrink-0 rounded-full"
-                            style={{ background: theme.vars['--th-accent'] ?? '#6b7c3a' }}
-                          />
-                          <span className="flex-1 truncate font-medium">{theme.name}</span>
-                          <span className="shrink-0 text-sm">{theme.emoji}</span>
-                          {isActive && <span className="shrink-0 text-[8px] text-zinc-400">●</span>}
-                        </button>
-                      );
-                    })}
+                    {COMMERCIAL_THEMES.map((theme) => (
+                      <button
+                        key={theme.id}
+                        onClick={() => setPendingTheme(pendingTheme === theme.id ? null : theme.id)}
+                        disabled={saving}
+                        className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition disabled:opacity-50 ${themeChipClass(theme.id)}`}
+                      >
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ background: theme.vars['--th-accent'] ?? '#6b7c3a' }}
+                        />
+                        <span className="flex-1 truncate font-medium">{theme.name}</span>
+                        <span className="shrink-0 text-sm">{theme.emoji}</span>
+                        {activeTheme === theme.id && pendingTheme !== theme.id && (
+                          <span className="shrink-0 text-[8px] text-zinc-400">●</span>
+                        )}
+                      </button>
+                    ))}
                   </div>
                 </div>
+
+                {/* Reset to default chip */}
+                {activeTheme !== 'default' && (
+                  <button
+                    onClick={() => setPendingTheme(pendingTheme === 'default' ? null : 'default')}
+                    disabled={saving}
+                    className={`w-full rounded-lg border px-3 py-2 text-left text-xs transition disabled:opacity-50 ${themeChipClass('default')}`}
+                  >
+                    <span className="font-medium text-zinc-500">✕ Reset to default</span>
+                  </button>
+                )}
+
+                {/* ── Confirm panel — appears when a theme is selected ── */}
+                {pendingTheme !== null && pendingTheme !== activeTheme && (
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                    <div className="mb-3 flex items-start gap-2">
+                      <span className="mt-px text-amber-400">⚠</span>
+                      <p className="text-[11px] leading-relaxed text-amber-300/80">
+                        This will update the storefront design for <span className="font-semibold text-amber-300">all visitors</span>.
+                        The change goes live the moment you apply it.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setPendingTheme(null)}
+                        className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 py-2 text-xs font-semibold text-zinc-400 transition hover:text-zinc-200"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => void applyTheme(pendingTheme)}
+                        disabled={saving}
+                        className="flex-1 rounded-lg border border-olive-500/40 bg-olive-500/15 py-2 text-xs font-semibold text-olive-300 transition hover:bg-olive-500/25 disabled:opacity-50"
+                      >
+                        {saving ? 'Applying…' : 'Apply theme'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
               </div>
             )}
           </div>
@@ -287,7 +328,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
         {/* Footer */}
         <div className="border-t border-zinc-800 px-5 py-4">
           <p className="text-[10px] text-zinc-700">
-            Theme changes apply to the storefront immediately. AI settings take effect on new tickets.
+            Theme changes go live immediately. AI settings take effect on new tickets.
           </p>
         </div>
       </div>
