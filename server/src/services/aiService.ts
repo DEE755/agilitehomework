@@ -44,8 +44,7 @@ function getAiConfig(modelOverride?: string) {
   return { url, apiKey };
 }
 
-// Faster model for bulk/structured tasks that don't need full Sonnet reasoning
-const INSIGHTS_MODEL = process.env.PYDANTIC_INSIGHTS_MODEL ?? 'claude-haiku-4-5-20251001';
+const INSIGHTS_MODEL = process.env.PYDANTIC_INSIGHTS_MODEL ?? process.env.PYDANTIC_ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
 
 // ---------------------------------------------------------------------------
 // Raw gateway call — Bedrock Converse API format
@@ -855,59 +854,12 @@ export interface StoreInsightsResult {
   };
 }
 
-const INSIGHTS_SYSTEM_PROMPT = `You are a senior marketing strategist and customer success expert analysing support ticket data for Agilate, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
+const INSIGHTS_SYSTEM_PROMPT = `Analyse support ticket data and return ONLY a JSON object. No markdown, no explanation.
 
-Your role: turn raw support data into sharp, boardroom-ready insights. Think like a CMO reviewing the support queue — what does this data tell us about the health of the business, customer satisfaction, revenue risk, growth opportunities, AND how well the support operation itself is running?
+JSON schema:
+{"storeHealthScore":0-10,"executiveSummary":"2 sentences","topIssues":[{"issue":"","urgency":"high|medium|low","recommendation":""}],"customerIntel":[{"insight":"","action":""}],"revenueRisks":[{"risk":"","magnitude":"high|medium|low","mitigation":""}],"opportunities":[{"opportunity":"","potentialImpact":""}],"priorityActions":[{"rank":1,"action":"","rationale":""}],"vendorPerformance":{"operationalScore":0-10,"summary":"1 sentence","agentEfficiency":[{"metric":"","reading":"","verdict":"good|ok|concern"}],"blindSpots":[{"issue":"","impact":"","fix":""}],"aiAgentRole":{"effectiveness":"high|medium|low","finding":""},"strengths":[""]}}
 
-You will receive aggregate statistics from the support ticket system including ticket volumes, customer sentiment, archetypes, refund/churn risk, top issues, product patterns, and operational metrics (agent count, unassigned tickets, response gaps, AI agent load).
-
-Return ONLY a JSON object with exactly these fields:
-{
-  "storeHealthScore": <number 0.0 to 10.0 — overall business health based on the data>,
-  "executiveSummary": "3-4 sentence executive summary of the current state of the business from a customer support perspective.",
-  "topIssues": [
-    { "issue": "...", "urgency": "high|medium|low", "recommendation": "One actionable sentence." }
-  ],
-  "customerIntel": [
-    { "insight": "Key customer behaviour or segment insight.", "action": "What to do about it." }
-  ],
-  "revenueRisks": [
-    { "risk": "...", "magnitude": "high|medium|low", "mitigation": "One sentence mitigation strategy." }
-  ],
-  "opportunities": [
-    { "opportunity": "A growth or retention opportunity visible in the data.", "potentialImpact": "Estimated business impact." }
-  ],
-  "priorityActions": [
-    { "rank": 1, "action": "Most important thing to do right now.", "rationale": "Why this is #1." }
-  ],
-  "vendorPerformance": {
-    "operationalScore": <number 0.0 to 10.0 — how efficiently the support team is operating>,
-    "summary": "2-3 sentences on support team performance: response coverage, agent workload, AI leverage, and critical gaps.",
-    "agentEfficiency": [
-      { "metric": "Metric name (e.g. High-priority coverage)", "reading": "Data-grounded observation (e.g. '3 high-priority tickets unassigned')", "verdict": "good|ok|concern" }
-    ],
-    "blindSpots": [
-      { "issue": "A gap or risk in the support operation.", "impact": "Business impact if left unaddressed.", "fix": "Concrete corrective action." }
-    ],
-    "aiAgentRole": { "effectiveness": "high|medium|low", "finding": "One sentence on how effectively the AI agent is absorbing ticket load and whether it is helping or creating bottlenecks." },
-    "strengths": ["One positive operational signal the team should keep doing.", "..."]
-  }
-}
-
-Rules:
-- topIssues: 3–5 items, sorted by urgency
-- customerIntel: 3–4 items
-- revenueRisks: 2–4 items
-- opportunities: 3–5 items
-- priorityActions: exactly 5 items (ranked 1–5)
-- vendorPerformance.agentEfficiency: 3–5 metrics
-- vendorPerformance.blindSpots: 2–4 items
-- vendorPerformance.strengths: 2–3 items
-- Be specific and numbers-driven where possible — cite the data
-- Think like a revenue-focused operator, not a support agent
-- If data is sparse (few tickets), say so in the summary and adjust confidence accordingly
-
-Respond with valid JSON only. No markdown, no code fences.`;
+Limits: topIssues 3 items, customerIntel 2, revenueRisks 2, opportunities 2, priorityActions 3, agentEfficiency 2, blindSpots 2, strengths 2. Be concise.`;
 
 export async function generateStoreInsights(input: StoreInsightsInput): Promise<StoreInsightsResult> {
   const responseGapPct = input.openTickets > 0
@@ -917,32 +869,11 @@ export async function generateStoreInsights(input: StoreInsightsInput): Promise<
     ? Math.round((input.aiAssignedCount / input.totalTickets) * 100)
     : 0;
 
-  const context = `
-Support Ticket Analytics:
-- Total tickets: ${input.totalTickets} (${input.openTickets} open, ${input.resolvedTickets} resolved)
-- Unanalyzed tickets (no AI data): ${input.unanalyzedCount}
-
-Priority breakdown: ${JSON.stringify(input.priorityBreakdown)}
-Sentiment breakdown: ${JSON.stringify(input.sentimentBreakdown)}
-Customer archetype breakdown: ${JSON.stringify(input.archetypeBreakdown)}
-Refund intent breakdown: ${JSON.stringify(input.refundIntentBreakdown)}
-Churn risk breakdown: ${JSON.stringify(input.churnRiskBreakdown)}
-Lifetime value breakdown: ${JSON.stringify(input.ltvBreakdown)}
-
-Top issue tags (by frequency): ${input.topTags.slice(0, 10).map((t) => `${t.tag} (${t.count})`).join(', ') || 'none'}
-
-Most-mentioned products: ${input.topProducts.slice(0, 8).map((p) => `${p.name} (${p.count} tickets)`).join(', ') || 'none'}
-
-Recent ticket summaries (sample of last 10):
-${input.recentSummaries.slice(0, 10).map((s, i) => `${i + 1}. ${s}`).join('\n') || 'None available'}
-
-Operational / Vendor Metrics:
-- Human agents: ${input.humanAgentCount}
-- Tickets currently assigned to AI agent: ${input.aiAssignedCount} (${aiLoadPct}% of total)
-- Open tickets with no assignee: ${input.unassignedOpenCount}
-- Open high-priority tickets with no assignee (critical gap): ${input.orphanedHighPriorityCount}
-- Open tickets with zero replies (never been responded to): ${input.noReplyOpenCount} (${responseGapPct}% of open tickets)
-`.trim();
+  const context = `Tickets: ${input.totalTickets} total (${input.openTickets} open, ${input.resolvedTickets} resolved). Unanalyzed: ${input.unanalyzedCount}.
+Priority: ${JSON.stringify(input.priorityBreakdown)}. Sentiment: ${JSON.stringify(input.sentimentBreakdown)}. Churn: ${JSON.stringify(input.churnRiskBreakdown)}. Refund: ${JSON.stringify(input.refundIntentBreakdown)}.
+Top tags: ${input.topTags.slice(0, 5).map((t) => `${t.tag}(${t.count})`).join(', ') || 'none'}.
+Top products: ${input.topProducts.slice(0, 4).map((p) => `${p.name}(${p.count})`).join(', ') || 'none'}.
+Agents: ${input.humanAgentCount} human. AI assigned: ${input.aiAssignedCount}(${aiLoadPct}%). Unassigned open: ${input.unassignedOpenCount}. High-priority unassigned: ${input.orphanedHighPriorityCount}. No-reply open: ${input.noReplyOpenCount}(${responseGapPct}%).`;
 
   const raw = await chatCompletion(INSIGHTS_SYSTEM_PROMPT, context, 120_000, INSIGHTS_MODEL);
 
