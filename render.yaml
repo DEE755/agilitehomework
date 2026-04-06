@@ -19,6 +19,7 @@ services:
   - type: web
     name: agilite-api
     runtime: node
+    plan: free                # explicitly opt into the free instance (default is starter = paid)
     rootDir: server
     buildCommand: npm install && npm run build
     startCommand: npm start
