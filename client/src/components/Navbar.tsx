@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-
-const links = [
-  { to: '/products', label: 'Products' },
-];
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { t, lang, toggleLang } = useLanguage();
 
   return (
     <header
@@ -27,27 +25,22 @@ export default function Navbar() {
           </span>
           <div>
             <span className="block text-xs font-bold uppercase tracking-widest text-zinc-100">Agilate</span>
-            <span className="block text-[9px] uppercase tracking-widest text-zinc-600">Customer Support</span>
+            <span className="block text-[9px] uppercase tracking-widest text-zinc-600">{t.nav.customerSupport}</span>
           </div>
         </NavLink>
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-1 sm:flex">
-          {links.map(({ to, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition ${
-                  isActive
-                    ? 'th-text'
-                    : 'text-zinc-500 hover:text-zinc-200'
-                }`
-              }
-            >
-              {label}
-            </NavLink>
-          ))}
+          <NavLink
+            to="/products"
+            className={({ isActive }) =>
+              `rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition ${
+                isActive ? 'th-text' : 'text-zinc-500 hover:text-zinc-200'
+              }`
+            }
+          >
+            {t.nav.products}
+          </NavLink>
 
           <NavLink
             to="/support/lookup"
@@ -57,21 +50,30 @@ export default function Navbar() {
               }`
             }
           >
-            My Tickets
+            {t.nav.myTickets}
           </NavLink>
 
           <NavLink
             to="/support/new"
-            className="th-btn ml-2 rounded border px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider transition"
+            className="th-btn ms-2 rounded border px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider transition"
           >
-            Open Ticket
+            {t.nav.openTicket}
           </NavLink>
+
+          {/* Language toggle */}
+          <button
+            onClick={toggleLang}
+            className="ms-1 rounded border border-zinc-800 px-2.5 py-1.5 text-[10px] font-bold text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300"
+            aria-label="Switch language"
+          >
+            {lang === 'en' ? t.nav.switchToHe : t.nav.switchToEn}
+          </button>
 
           <NavLink
             to="/admin/login"
-            className="ml-1 rounded px-2 py-1.5 text-[10px] text-zinc-700 transition hover:text-zinc-400"
+            className="ms-1 rounded px-2 py-1.5 text-[10px] text-zinc-700 transition hover:text-zinc-400"
           >
-            Admin
+            {t.nav.admin}
           </NavLink>
         </nav>
 
@@ -91,20 +93,17 @@ export default function Navbar() {
       {mobileOpen && (
         <div className="border-t border-zinc-800 bg-zinc-950 px-4 py-3 sm:hidden">
           <nav className="flex flex-col gap-1">
-            {links.map(({ to, label }) => (
-              <NavLink
-                key={to}
-                to={to}
-                onClick={() => setMobileOpen(false)}
-                className={({ isActive }) =>
-                  `rounded px-3 py-2.5 text-sm font-medium transition ${
-                    isActive ? 'bg-zinc-900 th-text' : 'text-zinc-400 hover:text-zinc-100'
-                  }`
-                }
-              >
-                {label}
-              </NavLink>
-            ))}
+            <NavLink
+              to="/products"
+              onClick={() => setMobileOpen(false)}
+              className={({ isActive }) =>
+                `rounded px-3 py-2.5 text-sm font-medium transition ${
+                  isActive ? 'bg-zinc-900 th-text' : 'text-zinc-400 hover:text-zinc-100'
+                }`
+              }
+            >
+              {t.nav.products}
+            </NavLink>
             <NavLink
               to="/support/lookup"
               onClick={() => setMobileOpen(false)}
@@ -114,15 +113,22 @@ export default function Navbar() {
                 }`
               }
             >
-              My Tickets
+              {t.nav.myTickets}
             </NavLink>
             <NavLink
               to="/support/new"
               onClick={() => setMobileOpen(false)}
               className="th-btn mt-1 rounded border px-3 py-2.5 text-center text-sm font-semibold"
             >
-              Open Ticket
+              {t.nav.openTicket}
             </NavLink>
+            {/* Language toggle mobile */}
+            <button
+              onClick={() => { toggleLang(); setMobileOpen(false); }}
+              className="mt-1 rounded border border-zinc-800 px-3 py-2 text-sm font-bold text-zinc-500 transition hover:text-zinc-300 text-center"
+            >
+              {lang === 'en' ? `עברית` : 'English'}
+            </button>
           </nav>
         </div>
       )}

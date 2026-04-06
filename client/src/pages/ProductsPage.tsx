@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProducts } from '../hooks/useProducts';
 import type { Product } from '../types/product';
 import ProductFinderWidget from '../components/ProductFinderWidget';
+import { useLanguage } from '../i18n/LanguageContext';
+import type { translations } from '../i18n/translations';
 
 const PRODUCT_PALETTES = [
   { badge: 'text-sky-400 bg-sky-500/10 border-sky-500/20',      bg: 'bg-sky-500/10',     text: 'text-sky-300'     },
@@ -81,12 +83,13 @@ function getRelated(current: Product, all: Product[], max = 3): Product[] {
 
 // ─── Product Detail Modal ─────────────────────────────────────────────────────
 
-function ProductModal({ product, allProducts, onClose, onGetHelp, onSelect }: {
+function ProductModal({ product, allProducts, onClose, onGetHelp, onSelect, tp }: {
   product: Product;
   allProducts: Product[];
   onClose: () => void;
   onGetHelp: (p: Product) => void;
   onSelect: (p: Product) => void;
+  tp: typeof translations.en.products;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [imgErrored, setImgErrored] = useState(false);
@@ -154,20 +157,20 @@ function ProductModal({ product, allProducts, onClose, onGetHelp, onSelect }: {
               disabled
               className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-5 py-2.5 text-sm font-semibold text-zinc-200 cursor-not-allowed"
             >
-              🛒 Buy it
+              {tp.buyIt}
             </button>
             <button
               onClick={() => { onClose(); onGetHelp(product); }}
               className="th-btn flex flex-1 items-center justify-center gap-2 rounded-lg border px-5 py-2.5 text-sm font-semibold transition"
             >
-              Get Help →
+              {tp.getHelpArrow}
             </button>
           </div>
 
           {/* Goes well with */}
           {related.length > 0 && (
             <div className="mt-6 border-t border-zinc-800 pt-5">
-              <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Goes well with</p>
+              <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">{tp.goesWith}</p>
               <div className="grid grid-cols-3 gap-3">
                 {related.map((p) => {
                   const rp = categoryPalette(p.category);
@@ -208,12 +211,14 @@ const PAGE_SIZE_OPTIONS = [8, 16, 24] as const;
 type PageSize = typeof PAGE_SIZE_OPTIONS[number] | 'all';
 
 export default function ProductsPage() {
+  const { t } = useLanguage();
+  const tp = t.products;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { products: allProducts, loading, error, reload } = useProducts();
   const products = allProducts.filter((p) => p.isActive !== false);
   const [query, setQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState<PageSize>(8);
   const [page, setPage] = useState(1);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -226,10 +231,10 @@ export default function ProductsPage() {
     if (match) setSelectedProduct(match);
   }, [searchParams, products]);
 
-  const categories = ['All', ...Array.from(new Set(products.map((p) => p.category)))];
+  const categories = Array.from(new Set(products.map((p) => p.category)));
 
   const filtered = products.filter((p) => {
-    const matchCat = activeCategory === 'All' || p.category === activeCategory;
+    const matchCat = activeCategory === null || p.category === activeCategory;
     const q = query.toLowerCase();
     const matchQuery =
       !q ||
@@ -256,11 +261,11 @@ export default function ProductsPage() {
       {/* Header */}
       <div className="mb-8">
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
-          Customer Portal
+          {tp.portal}
         </p>
-        <h1 className="text-2xl font-bold text-zinc-100">Products</h1>
+        <h1 className="text-2xl font-bold text-zinc-100">{tp.heading}</h1>
         <p className="mt-1 text-sm text-zinc-500">
-          Choose the product you need help with, then start a support request with the details pre-filled.
+          {tp.subtitle}
         </p>
       </div>
 
@@ -272,12 +277,12 @@ export default function ProductsPage() {
             type="text"
             value={query}
             onChange={(e) => handleFilterChange(() => setQuery(e.target.value))}
-            placeholder="Search by name, category, or SKU…"
+            placeholder={tp.searchPlaceholder}
             className="w-full rounded-lg border border-zinc-800 bg-zinc-900 py-2.5 pl-8 pr-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[var(--th-border)]"
           />
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Per page</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">{tp.perPage}</span>
           <div className="flex rounded-lg border border-zinc-800 overflow-hidden">
             {([...PAGE_SIZE_OPTIONS, 'all'] as PageSize[]).map((s) => (
               <button
@@ -289,7 +294,7 @@ export default function ProductsPage() {
                     : 'bg-zinc-900 text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                {s === 'all' ? 'All' : s}
+                {s === 'all' ? tp.allOption : s}
               </button>
             ))}
           </div>
@@ -298,6 +303,17 @@ export default function ProductsPage() {
 
       {/* Category chips */}
       <div className="mb-6 flex flex-wrap gap-2">
+        {/* "All" chip */}
+        <button
+          onClick={() => handleFilterChange(() => setActiveCategory(null))}
+          className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+            activeCategory === null
+              ? 'th-btn border'
+              : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300'
+          }`}
+        >
+          {tp.allOption}
+        </button>
         {categories.map((cat) => (
           <button
             key={cat}
@@ -321,7 +337,7 @@ export default function ProductsPage() {
             onClick={reload}
             className="mt-3 text-xs font-medium th-text hover:underline"
           >
-            Retry
+            {tp.retry}
           </button>
         </div>
       ) : loading ? (
@@ -331,14 +347,14 @@ export default function ProductsPage() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 py-16 text-center">
           <p className="text-sm text-zinc-500">
-            {products.length === 0 ? 'No products available yet' : 'No products match your search'}
+            {products.length === 0 ? tp.noProductsAvailable : tp.noProductsMatch}
           </p>
           {products.length > 0 && (
             <button
-              onClick={() => { setQuery(''); setActiveCategory('All'); }}
+              onClick={() => { setQuery(''); setActiveCategory(null); }}
               className="mt-3 text-xs font-medium th-text hover:underline"
             >
-              Clear filters
+              {tp.clearFilters}
             </button>
           )}
         </div>
@@ -379,13 +395,13 @@ export default function ProductsPage() {
                     disabled
                     className="rounded border border-zinc-700 px-3 py-1 text-xs font-medium text-zinc-300 cursor-not-allowed"
                   >
-                    🛒 Buy it
+                    {tp.buyIt}
                   </button>
                   <button
                     onClick={() => openTicket(product)}
                     className="th-btn rounded border px-3 py-1 text-xs font-semibold transition"
                   >
-                    Get Help
+                    {tp.getHelp}
                   </button>
                 </div>
               </div>
@@ -402,6 +418,7 @@ export default function ProductsPage() {
           onClose={() => setSelectedProduct(null)}
           onGetHelp={(p) => { setSelectedProduct(null); openTicket(p); }}
           onSelect={(p) => setSelectedProduct(p)}
+          tp={tp}
         />
       )}
 
@@ -417,7 +434,7 @@ export default function ProductsPage() {
               disabled={safePage === 1}
               className="rounded border border-zinc-800 px-3 py-1.5 text-xs text-zinc-500 transition hover:text-zinc-300 disabled:opacity-30"
             >
-              ← Prev
+              {tp.prev}
             </button>
             <span className="text-xs text-zinc-500">{safePage} / {totalPages}</span>
             <button
@@ -425,7 +442,7 @@ export default function ProductsPage() {
               disabled={safePage === totalPages}
               className="rounded border border-zinc-800 px-3 py-1.5 text-xs text-zinc-500 transition hover:text-zinc-300 disabled:opacity-30"
             >
-              Next →
+              {tp.next}
             </button>
           </div>
         </div>

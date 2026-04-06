@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useLanguage } from '../i18n/LanguageContext';
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
 
@@ -39,11 +40,7 @@ function lookupPalette(name: string) {
   return LOOKUP_PALETTES[h % LOOKUP_PALETTES.length];
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  new: 'Open',
-  in_progress: 'In Progress',
-  resolved: 'Resolved',
-};
+// STATUS_LABEL is built from translations inside the component
 
 const STATUS_CLS: Record<string, string> = {
   new:         'th-btn border',
@@ -61,6 +58,15 @@ const inputCls =
   'w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:ring-1 focus:ring-[var(--th-border)] focus:border-[var(--th-border)]';
 
 export default function TicketLookupPage() {
+  const { t } = useLanguage();
+  const tl = t.lookup;
+
+  const STATUS_LABEL: Record<string, string> = {
+    new: tl.statusOpen,
+    in_progress: tl.statusInProgress,
+    resolved: tl.statusResolved,
+  };
+
   const [searchParams] = useSearchParams();
 
   const prefillId    = searchParams.get('id') ?? '';
@@ -139,11 +145,11 @@ export default function TicketLookupPage() {
         >
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-olive-500">
-              Support Portal
+              {tl.portal}
             </p>
-            <h1 className="mt-1 text-2xl font-bold text-zinc-100">Track Your Request</h1>
+            <h1 className="mt-1 text-2xl font-bold text-zinc-100">{tl.heading}</h1>
             <p className="mt-1 text-sm text-zinc-500">
-              Enter your ticket reference and email address to view your conversation.
+              {tl.subtitle}
             </p>
           </div>
           <svg
@@ -161,26 +167,26 @@ export default function TicketLookupPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                  Ticket Reference
+                  {tl.ticketReference}
                 </label>
                 <input
                   type="text"
                   value={ticketId}
                   onChange={(e) => setTicketId(e.target.value)}
-                  placeholder="e.g. 6823a4f1c3b2e10012345678"
+                  placeholder={tl.ticketRefPlaceholder}
                   required
                   className={inputCls}
                 />
               </div>
               <div>
                 <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                  Email Address
+                  {tl.emailAddress}
                 </label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="The email you used when submitting"
+                  placeholder={tl.emailPlaceholder}
                   required
                   className={inputCls}
                 />
@@ -197,7 +203,7 @@ export default function TicketLookupPage() {
                 disabled={loading}
                 className="th-btn w-full rounded-lg border py-3 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-50"
               >
-                {loading ? 'Looking up…' : 'View My Ticket'}
+                {loading ? tl.lookingUp : tl.viewMyTicket}
               </button>
             </form>
           </div>
@@ -253,7 +259,7 @@ export default function TicketLookupPage() {
               </span>
             </div>
             <div className="mt-4 flex flex-wrap gap-4 text-[11px] text-zinc-600">
-              <span>Submitted by <span className="text-zinc-400">{ticket.authorName}</span></span>
+              <span>{tl.submittedBy} <span className="text-zinc-400">{ticket.authorName}</span></span>
               <span>{formatDate(ticket.createdAt)}</span>
             </div>
           </div>
@@ -269,7 +275,7 @@ export default function TicketLookupPage() {
                   </span>
                   <span className="text-xs font-semibold text-zinc-300">{ticket.authorName}</span>
                   <span className="rounded-full border border-zinc-800 bg-zinc-900 px-1.5 py-0.5 text-[9px] text-zinc-600">
-                    You
+                    {tl.you}
                   </span>
                 </div>
                 <span className="text-[10px] text-zinc-700">{formatDate(ticket.createdAt)}</span>
@@ -300,7 +306,7 @@ export default function TicketLookupPage() {
                     <span className="text-xs font-semibold text-zinc-300">{reply.authorName}</span>
                     {reply.isAgent && (
                       <span className="th-btn rounded-full border px-1.5 py-0.5 text-[9px]">
-                        Support Team
+                        {tl.supportTeam}
                       </span>
                     )}
                   </div>
@@ -312,7 +318,7 @@ export default function TicketLookupPage() {
 
             {ticket.replies.length === 0 && (
               <div className="rounded-xl border border-dashed border-zinc-800 px-5 py-8 text-center">
-                <p className="text-sm text-zinc-600">No replies yet — the support team will be in touch soon.</p>
+                <p className="text-sm text-zinc-600">{tl.noReplies}</p>
               </div>
             )}
           </div>
@@ -321,14 +327,14 @@ export default function TicketLookupPage() {
           {ticket.status !== 'resolved' && (
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5 sm:p-6">
               <p className="mb-4 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
-                Send a Message
+                {tl.sendMessage}
               </p>
               <form onSubmit={(e) => void handleReply(e)} className="space-y-3">
                 <textarea
                   value={replyBody}
                   onChange={(e) => setReplyBody(e.target.value)}
                   rows={4}
-                  placeholder="Add more details or ask a follow-up question…"
+                  placeholder={tl.replyPlaceholder}
                   required
                   disabled={replySending}
                   className="block w-full rounded-lg border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-olive-500/20 resize-none disabled:opacity-50"
@@ -342,7 +348,7 @@ export default function TicketLookupPage() {
                     disabled={replySending || !replyBody.trim()}
                     className="th-btn rounded-lg border px-6 py-2.5 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-40"
                   >
-                    {replySending ? 'Sending…' : 'Send Message'}
+                    {replySending ? tl.sending : tl.sendMessageBtn}
                   </button>
                 </div>
               </form>
@@ -355,13 +361,13 @@ export default function TicketLookupPage() {
               to="/support/new"
               className="th-btn flex-1 rounded-lg border px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider transition"
             >
-              Open a New Request
+              {tl.openNewRequest}
             </Link>
             <button
               onClick={() => { setTicket(null); setExpanded(true); setTicketId(''); }}
               className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-zinc-400 transition hover:text-zinc-200"
             >
-              Look Up a Different Ticket
+              {tl.lookUpDifferent}
             </button>
           </div>
         </div>

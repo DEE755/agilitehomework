@@ -6,6 +6,8 @@ import ProductPickerModal from '../components/ProductPickerModal';
 import { useProducts } from '../hooks/useProducts';
 import type { Product } from '../types/product';
 import type { Attachment } from '../types/ticket';
+import { useLanguage } from '../i18n/LanguageContext';
+import type { translations } from '../i18n/translations';
 
 interface FormState {
   title: string;
@@ -26,19 +28,21 @@ const ACCEPTED_IMAGE_TYPES = new Set(['image/gif', 'image/jpeg', 'image/png', 'i
 const MAX_TICKET_IMAGE_COUNT = 5;
 const MAX_TICKET_IMAGE_BYTES = 10 * 1024 * 1024;
 
-function validate(form: FormState): FormErrors {
+type TCT = typeof translations.en.createTicket;
+
+function validate(form: FormState, tc: TCT): FormErrors {
   const errors: FormErrors = {};
-  if (!form.title.trim()) errors.title = 'Title is required';
-  else if (form.title.trim().length < 3) errors.title = 'Must be at least 3 characters';
+  if (!form.title.trim()) errors.title = tc.titleRequired;
+  else if (form.title.trim().length < 3) errors.title = tc.titleTooShort;
 
-  if (!form.description.trim()) errors.description = 'Description is required';
+  if (!form.description.trim()) errors.description = tc.descriptionRequired;
   else if (form.description.trim().length < 10)
-    errors.description = 'Must be at least 10 characters';
+    errors.description = tc.descriptionTooShort;
 
-  if (!form.authorName.trim()) errors.authorName = 'Name is required';
+  if (!form.authorName.trim()) errors.authorName = tc.nameRequired;
 
-  if (!form.authorEmail.trim()) errors.authorEmail = 'Email is required';
-  else if (!EMAIL_RE.test(form.authorEmail)) errors.authorEmail = 'Enter a valid email address';
+  if (!form.authorEmail.trim()) errors.authorEmail = tc.emailRequired;
+  else if (!EMAIL_RE.test(form.authorEmail)) errors.authorEmail = tc.emailInvalid;
 
   return errors;
 }
@@ -69,6 +73,8 @@ type AiAskState =
   | { stage: 'answered'; answer: string; shouldEscalate: boolean; question: string; suggestedTitle: string; suggestedDescription: string };
 
 export default function CreateTicketPage() {
+  const { t } = useLanguage();
+  const tc = t.createTicket;
   const navigate = useNavigate();
   const { toast } = useToast();
   const { products, loading: productsLoading, error: productsError, reload: reloadProducts } = useProducts();
@@ -254,7 +260,7 @@ export default function CreateTicketPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const fieldErrors = validate(form);
+    const fieldErrors = validate(form, tc);
     if (Object.keys(fieldErrors).length > 0) {
       setErrors(fieldErrors);
       return;
@@ -321,14 +327,14 @@ export default function CreateTicketPage() {
             to="/products"
             className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 transition hover:text-zinc-300"
           >
-            ← Back to Products
+            {tc.backToProducts}
           </Link>
           <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
-            Customer Portal
+            {tc.portal}
           </p>
-          <h1 className="text-2xl font-bold text-zinc-100">Open a Support Request</h1>
+          <h1 className="text-2xl font-bold text-zinc-100">{tc.heading}</h1>
           <p className="mt-1 max-w-lg text-sm text-zinc-500">
-            Share the issue once. The support team will handle status changes, internal triage, and follow-up from the admin workspace.
+            {tc.subtitle}
           </p>
         </div>
 
@@ -338,14 +344,14 @@ export default function CreateTicketPage() {
             <div className="mb-3 flex items-start gap-2">
               <span className="mt-0.5 text-olive-400">✦</span>
               <div className="flex-1">
-                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">AI Answer</p>
+                <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">{tc.aiAnswer}</p>
                 <p className="text-xs text-zinc-500 italic">"{aiAsk.question}"</p>
               </div>
             </div>
             <p className="mb-4 text-sm leading-relaxed text-zinc-200">{aiAsk.answer}</p>
             {aiAsk.shouldEscalate && (
               <p className="mb-4 rounded border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-400">
-                This type of issue typically requires our support team — please submit a ticket below.
+                {tc.escalateWarning}
               </p>
             )}
             <div className="flex gap-2">
@@ -353,13 +359,13 @@ export default function CreateTicketPage() {
                 onClick={() => navigate('/products')}
                 className="flex-1 rounded border border-emerald-500/30 bg-emerald-500/10 py-2 text-xs font-semibold uppercase tracking-wider text-emerald-400 transition hover:bg-emerald-500/20"
               >
-                ✓ This solved my issue
+                {tc.solvedMyIssue}
               </button>
               <button
                 onClick={handleStillNeedSupport}
                 className="flex-1 rounded border border-zinc-700 bg-zinc-800 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-400 transition hover:text-zinc-200"
               >
-                I still need support
+                {tc.stillNeedSupport}
               </button>
             </div>
           </div>
@@ -371,8 +377,8 @@ export default function CreateTicketPage() {
           >
             <div className="flex items-center gap-2.5">
               <span className="text-olive-400">✦</span>
-              <span className="text-sm font-semibold text-zinc-200">Get Instant Help</span>
-              <span className="text-xs text-zinc-600">— ask AI before opening a ticket</span>
+              <span className="text-sm font-semibold text-zinc-200">{tc.getInstantHelp}</span>
+              <span className="text-xs text-zinc-600">{tc.askAiSubtitle}</span>
             </div>
             <span className="text-xs text-zinc-600">›</span>
           </button>
@@ -380,7 +386,7 @@ export default function CreateTicketPage() {
           <div className="mb-8 rounded-xl border border-olive-500/20 bg-olive-500/5 p-5">
             <div className="mb-3 flex items-center gap-2">
               <span className="text-olive-400">✦</span>
-              <p className="text-sm font-semibold text-zinc-200">Get Instant Help</p>
+              <p className="text-sm font-semibold text-zinc-200">{tc.getInstantHelp}</p>
               <button
                 type="button"
                 onClick={() => setAiPanelOpen(false)}
@@ -389,7 +395,7 @@ export default function CreateTicketPage() {
                 ✕
               </button>
             </div>
-            <p className="mb-4 text-xs text-zinc-500">Ask a quick question — you may get an instant answer without opening a ticket.</p>
+            <p className="mb-4 text-xs text-zinc-500">{tc.askAiDescription}</p>
 
             {/* Inline product selector */}
             <button
@@ -403,11 +409,11 @@ export default function CreateTicketPage() {
                     <img src={selectedProduct.imageUrl} alt="" className="h-6 w-6 rounded object-cover" />
                   )}
                   <span className="flex-1 truncate text-zinc-200">{selectedProduct.name}</span>
-                  <span className="text-[10px] text-zinc-600">change</span>
+                  <span className="text-[10px] text-zinc-600">{tc.change}</span>
                 </>
               ) : (
                 <>
-                  <span className="flex-1 text-zinc-600">Select a product (optional)</span>
+                  <span className="flex-1 text-zinc-600">{tc.selectProductOptional}</span>
                   <span className="text-[10px] text-zinc-600">›</span>
                 </>
               )}
@@ -418,7 +424,7 @@ export default function CreateTicketPage() {
                 type="text"
                 value={aiQuestion}
                 onChange={(e) => setAiQuestion(e.target.value)}
-                placeholder="e.g. Which product is best for my needs?"
+                placeholder={tc.askAiPlaceholder}
                 disabled={aiAsk.stage === 'asking'}
                 autoFocus
                 className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-olive-500/20 disabled:opacity-50"
@@ -428,7 +434,7 @@ export default function CreateTicketPage() {
                 disabled={aiAsk.stage === 'asking' || !aiQuestion.trim()}
                 className="th-btn shrink-0 rounded border px-4 py-2 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-40"
               >
-                {aiAsk.stage === 'asking' ? '…' : 'Ask AI'}
+                {aiAsk.stage === 'asking' ? '…' : tc.askAi}
               </button>
             </form>
           </div>
@@ -445,7 +451,7 @@ export default function CreateTicketPage() {
 
           {/* Product selector */}
           <div>
-            <label className={labelCls}>Product <span className="normal-case text-zinc-600">(optional)</span></label>
+            <label className={labelCls}>{tc.productLabel} <span className="normal-case text-zinc-600">{tc.optional}</span></label>
             <button
               type="button"
               onClick={() => setPickerOpen(true)}
@@ -465,9 +471,9 @@ export default function CreateTicketPage() {
                   <span className="text-zinc-100">{selectedProduct.name}</span>
                 </span>
               ) : productsLoading ? (
-                <span className="text-zinc-600">Loading products…</span>
+                <span className="text-zinc-600">{tc.loadingProducts}</span>
               ) : (
-                <span className="text-zinc-600">Select a product…</span>
+                <span className="text-zinc-600">{tc.selectProductPlaceholder}</span>
               )}
               <span className="text-zinc-600">▾</span>
             </button>
@@ -477,21 +483,21 @@ export default function CreateTicketPage() {
                 onClick={() => setSelectedProductId('')}
                 className="mt-1.5 text-xs text-zinc-600 hover:text-zinc-400"
               >
-                ✕ Clear selection
+                {tc.clearSelection}
               </button>
             )}
           </div>
 
           {/* Title */}
           <div>
-            <label htmlFor="title" className={labelCls}>Title *</label>
+            <label htmlFor="title" className={labelCls}>{tc.titleLabel}</label>
             <input
               id="title"
               name="title"
               type="text"
               value={form.title}
               onChange={handleChange}
-              placeholder="Brief summary of your issue"
+              placeholder={tc.titlePlaceholder}
               className={inputCls(!!errors.title)}
             />
             <FieldError message={errors.title} />
@@ -499,14 +505,14 @@ export default function CreateTicketPage() {
 
           {/* Description */}
           <div>
-            <label htmlFor="description" className={labelCls}>Description *</label>
+            <label htmlFor="description" className={labelCls}>{tc.descriptionLabel}</label>
             <textarea
               id="description"
               name="description"
               value={form.description}
               onChange={handleChange}
               rows={5}
-              placeholder="Steps to reproduce, what you expected, what actually happened…"
+              placeholder={tc.descriptionPlaceholder}
               className={inputCls(!!errors.description)}
             />
             <FieldError message={errors.description} />
@@ -516,9 +522,9 @@ export default function CreateTicketPage() {
           <div>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <label className={labelCls}>Images <span className="normal-case text-zinc-600">(optional)</span></label>
+                <label className={labelCls}>{tc.imagesLabel} <span className="normal-case text-zinc-600">{tc.optional}</span></label>
                 <p className="text-xs text-zinc-600">
-                  Add up to {MAX_TICKET_IMAGE_COUNT} screenshots or photos. GIF, JPG, PNG, WEBP. Max {Math.round(MAX_TICKET_IMAGE_BYTES / (1024 * 1024))} MB each.
+                  {tc.imageHint.replace('{max}', String(MAX_TICKET_IMAGE_COUNT)).replace('{size}', String(Math.round(MAX_TICKET_IMAGE_BYTES / (1024 * 1024))))}
                 </p>
               </div>
               <input
@@ -535,7 +541,7 @@ export default function CreateTicketPage() {
                 disabled={submitStage !== 'idle'}
                 className="shrink-0 rounded border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-400 transition hover:border-zinc-700 hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Add Images
+                {tc.addImages}
               </button>
             </div>
 
@@ -561,7 +567,7 @@ export default function CreateTicketPage() {
                         disabled={submitStage !== 'idle'}
                         className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-zinc-500 transition hover:text-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        Remove
+                        {tc.remove}
                       </button>
                     </div>
                   </div>
@@ -575,7 +581,7 @@ export default function CreateTicketPage() {
           {/* Author row */}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <div>
-              <label htmlFor="authorName" className={labelCls}>Your Name *</label>
+              <label htmlFor="authorName" className={labelCls}>{tc.nameLabel}</label>
               <input
                 id="authorName"
                 name="authorName"
@@ -588,7 +594,7 @@ export default function CreateTicketPage() {
               <FieldError message={errors.authorName} />
             </div>
             <div>
-              <label htmlFor="authorEmail" className={labelCls}>Your Email *</label>
+              <label htmlFor="authorEmail" className={labelCls}>{tc.emailLabel}</label>
               <input
                 id="authorEmail"
                 name="authorEmail"
@@ -608,7 +614,7 @@ export default function CreateTicketPage() {
               to="/products"
               className="rounded border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-zinc-500 transition hover:text-zinc-300"
             >
-              Cancel
+              {tc.cancel}
             </Link>
             <button
               type="submit"
@@ -616,10 +622,10 @@ export default function CreateTicketPage() {
               className="th-btn rounded border px-6 py-2.5 text-xs font-semibold uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitStage === 'uploading'
-                ? 'Uploading Images…'
+                ? tc.uploadingImages
                 : submitStage === 'submitting'
-                  ? 'Submitting…'
-                  : 'Submit Request'}
+                  ? tc.submitting
+                  : tc.submitRequest}
             </button>
           </div>
         </form>

@@ -28,13 +28,33 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
   );
 }
 
-const JEWISH_THEMES  = THEMES.filter((t) => t.group === 'jewish');
+function SectionHeader({ label, expanded, onToggle }: { label: string; expanded: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className="flex w-full items-center justify-between rounded-lg px-1 py-0.5 text-left transition hover:bg-zinc-900/60"
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{label}</p>
+      <svg
+        viewBox="0 0 12 12"
+        fill="none"
+        className={`h-3 w-3 shrink-0 text-zinc-600 transition-transform duration-200 ${expanded ? '' : '-rotate-90'}`}
+      >
+        <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </button>
+  );
+}
+
+const JEWISH_THEMES     = THEMES.filter((t) => t.group === 'jewish');
 const COMMERCIAL_THEMES = THEMES.filter((t) => t.group === 'commercial');
 
 export default function SettingsPanel({ open, onClose }: Props) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState<string | null>(null);
+  const [aiExpanded, setAiExpanded]     = useState(true);
+  const [themesExpanded, setThemesExpanded] = useState(true);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,13 +62,11 @@ export default function SettingsPanel({ open, onClose }: Props) {
     adminApi.settings.get()
       .then((res) => {
         setSettings(res.data);
-        // Sync stored theme with server value on panel open
         if (res.data.activeTheme) applyTheme(res.data.activeTheme);
       })
       .catch((e: Error) => setError(e.message));
   }, [open]);
 
-  // Close on Escape
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -75,7 +93,6 @@ export default function SettingsPanel({ open, onClose }: Props) {
 
   async function setTheme(themeId: string) {
     if (!settings) return;
-    // Apply immediately (optimistic, live preview)
     applyTheme(themeId);
     const optimistic = { ...settings, activeTheme: themeId === 'default' ? null : themeId };
     setSettings(optimistic);
@@ -126,133 +143,144 @@ export default function SettingsPanel({ open, onClose }: Props) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-8">
+        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
           {error && (
             <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
               {error}
             </div>
           )}
 
-          {/* AI section */}
-          <div>
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">AI Automation</p>
-            <div className="space-y-3">
-              <div className="flex items-start justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-                <div className="flex-1">
-                  <p className="text-xs font-semibold text-zinc-200">Auto-reply</p>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
-                    When a new ticket is simple and informational, AI will send a reply and mark it resolved automatically — no agent needed.
-                  </p>
-                  {settings?.autoReplyEnabled && (
-                    <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-olive-500/20 bg-olive-500/10 px-2 py-0.5 text-[10px] font-semibold text-olive-400">
-                      <span className="h-1.5 w-1.5 rounded-full bg-olive-400" />
-                      Active
+          {/* ── AI Settings ──────────────────────────────────────────────── */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
+            <SectionHeader label="AI Settings" expanded={aiExpanded} onToggle={() => setAiExpanded((v) => !v)} />
+
+            {aiExpanded && (
+              <div className="mt-3 space-y-3">
+                {/* Auto-reply */}
+                <div className="flex items-start justify-between gap-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3.5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-zinc-200">Auto-reply</p>
+                    <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+                      AI replies automatically to simple tickets and marks them resolved — no agent needed.
                     </p>
-                  )}
+                    {settings?.autoReplyEnabled && (
+                      <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-olive-500/20 bg-olive-500/10 px-2 py-0.5 text-[10px] font-semibold text-olive-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-olive-400" />
+                        Active
+                      </p>
+                    )}
+                  </div>
+                  <Toggle
+                    checked={settings?.autoReplyEnabled ?? false}
+                    onChange={(v) => void toggle('autoReplyEnabled', v)}
+                    disabled={saving || settings === null}
+                  />
                 </div>
-                <Toggle
-                  checked={settings?.autoReplyEnabled ?? false}
-                  onChange={(v) => void toggle('autoReplyEnabled', v)}
-                  disabled={saving || settings === null}
-                />
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Seasonal Theme section */}
-          <div>
-            <div className="mb-3 flex items-baseline justify-between">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-600">Storefront Theme</p>
-              {activeTheme !== 'default' && (
+          {/* ── Themes ───────────────────────────────────────────────────── */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <SectionHeader label="Themes" expanded={themesExpanded} onToggle={() => setThemesExpanded((v) => !v)} />
+              </div>
+              {activeTheme !== 'default' && themesExpanded && (
                 <button
                   onClick={() => void setTheme('default')}
-                  className="text-[10px] text-zinc-600 transition hover:text-zinc-400"
+                  className="shrink-0 text-[10px] text-zinc-600 transition hover:text-zinc-400"
                 >
-                  Reset to default
+                  Reset
                 </button>
               )}
             </div>
 
-            {/* Active theme display */}
-            {activeTheme !== 'default' && (() => {
-              const t = getTheme(activeTheme);
-              return (
-                <div
-                  className="mb-4 overflow-hidden rounded-xl border border-zinc-700"
-                  style={{ background: t.banner?.gradient ?? '#18181b' }}
-                >
-                  <div className="px-4 py-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">Active theme</p>
-                    <p className="mt-0.5 text-sm font-bold text-white">
-                      {t.emoji} {t.name}
-                      {t.nameHe && <span className="ml-2 text-white/60">{t.nameHe}</span>}
-                    </p>
-                    {t.banner && (
-                      <p className="mt-1 text-[11px] text-white/70 leading-snug">{t.banner.text}</p>
-                    )}
+            {themesExpanded && (
+              <div className="mt-3 space-y-4">
+                {/* Active theme preview */}
+                {activeTheme !== 'default' && (() => {
+                  const th = getTheme(activeTheme);
+                  return (
+                    <div
+                      className="overflow-hidden rounded-lg border border-zinc-700"
+                      style={{ background: th.banner?.gradient ?? '#18181b' }}
+                    >
+                      <div className="px-3.5 py-2.5">
+                        <p className="text-[9px] font-semibold uppercase tracking-widest text-white/50">Active</p>
+                        <p className="mt-0.5 text-sm font-bold text-white">
+                          {th.emoji} {th.name}
+                          {th.nameHe && <span className="ms-2 text-white/60">{th.nameHe}</span>}
+                        </p>
+                        {th.banner && (
+                          <p className="mt-0.5 text-[11px] text-white/70 leading-snug">{th.banner.text}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Holidays */}
+                <div>
+                  <p className="mb-2 text-[9px] font-semibold uppercase tracking-widest text-zinc-700">Holidays</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {JEWISH_THEMES.map((theme) => {
+                      const isActive = activeTheme === theme.id;
+                      return (
+                        <button
+                          key={theme.id}
+                          onClick={() => void setTheme(theme.id)}
+                          disabled={saving}
+                          className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition disabled:opacity-50 ${
+                            isActive
+                              ? 'border-zinc-500 bg-zinc-800 text-zinc-100'
+                              : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                          }`}
+                        >
+                          <span
+                            className="h-2 w-2 shrink-0 rounded-full"
+                            style={{ background: theme.vars['--th-accent'] ?? '#6b7c3a' }}
+                          />
+                          <span className="flex-1 truncate font-medium">{theme.name}</span>
+                          <span className="shrink-0 text-sm">{theme.emoji}</span>
+                          {isActive && <span className="shrink-0 text-[8px] text-zinc-400">●</span>}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
-              );
-            })()}
 
-            {/* Jewish / Israeli holidays */}
-            <p className="mb-2 text-[9px] font-semibold uppercase tracking-widest text-zinc-700">Holidays</p>
-            <div className="grid grid-cols-2 gap-2">
-              {JEWISH_THEMES.map((theme) => {
-                const isActive = activeTheme === theme.id;
-                return (
-                  <button
-                    key={theme.id}
-                    onClick={() => void setTheme(theme.id)}
-                    disabled={saving}
-                    className={`group flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-xs transition disabled:opacity-50 ${
-                      isActive
-                        ? 'border-zinc-500 bg-zinc-800 text-zinc-100'
-                        : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
-                    }`}
-                  >
-                    {/* Color dot */}
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ background: theme.vars['--th-accent'] ?? '#6b7c3a' }}
-                    />
-                    <span className="flex-1 truncate font-medium">
-                      {theme.id === 'default' ? 'Default' : theme.name}
-                    </span>
-                    <span className="shrink-0">{theme.emoji}</span>
-                    {isActive && <span className="shrink-0 text-[9px] text-zinc-400">●</span>}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Commercial moments */}
-            <p className="mb-2 mt-4 text-[9px] font-semibold uppercase tracking-widest text-zinc-700">Commercial</p>
-            <div className="grid grid-cols-2 gap-2">
-              {COMMERCIAL_THEMES.map((theme) => {
-                const isActive = activeTheme === theme.id;
-                return (
-                  <button
-                    key={theme.id}
-                    onClick={() => void setTheme(theme.id)}
-                    disabled={saving}
-                    className={`group flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-xs transition disabled:opacity-50 ${
-                      isActive
-                        ? 'border-zinc-500 bg-zinc-800 text-zinc-100'
-                        : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
-                    }`}
-                  >
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ background: theme.vars['--th-accent'] ?? '#6b7c3a' }}
-                    />
-                    <span className="flex-1 truncate font-medium">{theme.name}</span>
-                    <span className="shrink-0">{theme.emoji}</span>
-                    {isActive && <span className="shrink-0 text-[9px] text-zinc-400">●</span>}
-                  </button>
-                );
-              })}
-            </div>
+                {/* Commercial */}
+                <div>
+                  <p className="mb-2 text-[9px] font-semibold uppercase tracking-widest text-zinc-700">Commercial</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {COMMERCIAL_THEMES.map((theme) => {
+                      const isActive = activeTheme === theme.id;
+                      return (
+                        <button
+                          key={theme.id}
+                          onClick={() => void setTheme(theme.id)}
+                          disabled={saving}
+                          className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition disabled:opacity-50 ${
+                            isActive
+                              ? 'border-zinc-500 bg-zinc-800 text-zinc-100'
+                              : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                          }`}
+                        >
+                          <span
+                            className="h-2 w-2 shrink-0 rounded-full"
+                            style={{ background: theme.vars['--th-accent'] ?? '#6b7c3a' }}
+                          />
+                          <span className="flex-1 truncate font-medium">{theme.name}</span>
+                          <span className="shrink-0 text-sm">{theme.emoji}</span>
+                          {isActive && <span className="shrink-0 text-[8px] text-zinc-400">●</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

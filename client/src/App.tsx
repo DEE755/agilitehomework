@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ToastProvider } from './components/Toast';
+import { LanguageProvider } from './i18n/LanguageContext';
 
 // Customer layout + pages
 import Layout from './components/Layout';
@@ -22,6 +23,7 @@ function RedirectWithSearch({ to }: { to: string }) {
 
 export default function App() {
   return (
+    <LanguageProvider>
     <ToastProvider>
       <BrowserRouter>
         <Routes>
@@ -52,5 +54,6 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </ToastProvider>
+    </LanguageProvider>
   );
 }
