@@ -315,13 +315,15 @@ export default function AdminAgentsPage() {
                             {/* Admin actions */}
                             {isAdmin && !isAi && !isSelf && (
                               <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => void handleResend(agent._id)}
-                                  disabled={resending === agent._id}
-                                  className="rounded border border-zinc-800 px-2.5 py-1 text-[10px] font-semibold text-zinc-600 transition hover:border-sky-500/30 hover:text-sky-400 disabled:opacity-40"
-                                >
-                                  {resending === agent._id ? '…' : 'Resend invite'}
-                                </button>
+                                {agent.mustChangePassword && (
+                                  <button
+                                    onClick={() => void handleResend(agent._id)}
+                                    disabled={resending === agent._id}
+                                    className="rounded border border-zinc-800 px-2.5 py-1 text-[10px] font-semibold text-zinc-600 transition hover:border-sky-500/30 hover:text-sky-400 disabled:opacity-40"
+                                  >
+                                    {resending === agent._id ? '…' : 'Resend invite'}
+                                  </button>
+                                )}
                                 {confirmDelete === agent._id ? (
                                   <>
                                     <span className="text-xs text-zinc-500">Remove?</span>
