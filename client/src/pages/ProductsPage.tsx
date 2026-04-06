@@ -270,7 +270,7 @@ export default function ProductsPage() {
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
           {tp.portal}
         </p>
-        <h1 className="text-2xl font-bold text-zinc-100">{tp.heading}</h1>
+        <h1 className="text-xl font-bold text-zinc-100 sm:text-2xl">{tp.heading}</h1>
         <p className="mt-1 text-sm text-zinc-500">
           {tp.subtitle}
         </p>

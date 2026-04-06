@@ -147,7 +147,7 @@ export default function TicketLookupPage() {
             <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-olive-500">
               {tl.portal}
             </p>
-            <h1 className="mt-1 text-2xl font-bold text-zinc-100">{tl.heading}</h1>
+            <h1 className="mt-1 text-xl font-bold text-zinc-100 sm:text-2xl">{tl.heading}</h1>
             <p className="mt-1 text-sm text-zinc-500">
               {tl.subtitle}
             </p>

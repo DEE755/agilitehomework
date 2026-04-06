@@ -414,85 +414,102 @@ export default function AdminDashboardPage() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-3">
+      <div className="mb-5 flex items-center justify-between gap-3">
         <div>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">Support Workspace</p>
+          <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">Support Workspace</p>
           <h1 className="text-xl font-bold text-zinc-100 sm:text-2xl">Ticket Queue</h1>
-          <p className="mt-1 text-sm text-zinc-500">
-            {loading ? '\u00A0' : `${total} request${total !== 1 ? 's' : ''} in queue`}
+          <p className="mt-0.5 text-sm text-zinc-500">
+            {loading ? '\u00A0' : `${total} ticket${total !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button onClick={() => void fetchData()} className="rounded border border-zinc-800 px-3 py-2 text-xs font-medium text-zinc-500 transition hover:text-zinc-300">
-            ↻ Refresh
-          </button>
-        </div>
+        <button onClick={() => void fetchData()} className="shrink-0 rounded border border-zinc-800 px-3 py-2 text-xs font-medium text-zinc-500 transition hover:text-zinc-300">
+          ↻ Refresh
+        </button>
       </div>
 
       {/* Stats */}
       {stats && (
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard label="Total"       value={stats.total}       color="text-zinc-100" />
-          <StatCard label="New"         value={stats.new}         color="text-olive-400" />
-          <StatCard label="In Progress" value={stats.in_progress} color="text-sky-400" />
-          <StatCard label="Resolved"    value={stats.resolved}    color="text-violet-400" />
-          <StatCard label="Unassigned"  value={stats.unassigned}  color="text-red-400" />
-        </div>
+        <>
+          {/* Mobile: single compact scrollable row */}
+          <div className="mb-5 flex items-center gap-2 overflow-x-auto pb-0.5 sm:hidden">
+            {([
+              { label: 'Total',       value: stats.total,       color: 'text-zinc-100'    },
+              { label: 'New',         value: stats.new,         color: 'text-olive-400'   },
+              { label: 'In Progress', value: stats.in_progress, color: 'text-sky-400'     },
+              { label: 'Resolved',    value: stats.resolved,    color: 'text-violet-400'  },
+              { label: 'Unassigned',  value: stats.unassigned,  color: 'text-red-400'     },
+            ] as const).map(({ label, value, color }) => (
+              <div key={label} className="flex shrink-0 items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1.5">
+                <span className={`text-sm font-bold tabular-nums ${color}`}>{value}</span>
+                <span className="text-[10px] font-medium text-zinc-600">{label}</span>
+              </div>
+            ))}
+          </div>
+          {/* Desktop: card grid */}
+          <div className="mb-6 hidden sm:grid grid-cols-3 gap-3 lg:grid-cols-5">
+            <StatCard label="Total"       value={stats.total}       color="text-zinc-100" />
+            <StatCard label="New"         value={stats.new}         color="text-olive-400" />
+            <StatCard label="In Progress" value={stats.in_progress} color="text-sky-400" />
+            <StatCard label="Resolved"    value={stats.resolved}    color="text-violet-400" />
+            <StatCard label="Unassigned"  value={stats.unassigned}  color="text-red-400" />
+          </div>
+        </>
       )}
 
       {/* Filters */}
-      <div className="mb-5 flex flex-wrap gap-2">
-        {/* Status tabs — sliding pill selector */}
+      <div className="mb-5 space-y-2">
+        {/* Row 1: Status pill selector (full width on mobile) */}
         <StatusPillSelector value={status} onChange={setStatus} />
 
-        {/* Priority */}
-        <select
-          value={priority}
-          onChange={(e) => {
-            const val = e.target.value as PriorityFilter;
-            setPriority(val);
-            if (val === 'irrelevant') setStatus('resolved');
-          }}
-          className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 focus:outline-none focus:ring-2 focus:ring-olive-500/30"
-        >
-          <option value="all">All priorities</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-          <option value="irrelevant">Irrelevant</option>
-        </select>
+        {/* Row 2: secondary filters — horizontal scroll on mobile */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+          <select
+            value={priority}
+            onChange={(e) => {
+              const val = e.target.value as PriorityFilter;
+              setPriority(val);
+              if (val === 'irrelevant') setStatus('resolved');
+            }}
+            className="shrink-0 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 focus:outline-none focus:ring-2 focus:ring-olive-500/30"
+          >
+            <option value="all">All priorities</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+            <option value="irrelevant">Irrelevant</option>
+          </select>
 
-        {/* Agent filter */}
-        <select
-          value={assignedTo}
-          onChange={(e) => setAssignedTo(e.target.value)}
-          className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 focus:outline-none focus:ring-2 focus:ring-olive-500/30"
-        >
-          <option value="">All agents</option>
-          <option value="unassigned">Unassigned</option>
-          {agents.map((a) => (
-            <option key={a._id} value={a._id}>{a.name}</option>
-          ))}
-        </select>
+          <select
+            value={assignedTo}
+            onChange={(e) => setAssignedTo(e.target.value)}
+            className="shrink-0 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-400 focus:outline-none focus:ring-2 focus:ring-olive-500/30"
+          >
+            <option value="">All agents</option>
+            <option value="unassigned">Unassigned</option>
+            {agents.map((a) => (
+              <option key={a._id} value={a._id}>{a.name}</option>
+            ))}
+          </select>
 
-        <ClassByDropdown value={sortBy} onChange={setSortBy} />
+          <ClassByDropdown value={sortBy} onChange={setSortBy} />
 
-        <button
-          onClick={() => setShowMktCols((v) => !v)}
-          title={showMktCols ? 'Hide marketing intelligence columns' : 'Show marketing intelligence columns'}
-          className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition ${
-            showMktCols
-              ? 'border-rose-500/40 bg-rose-500/10 text-rose-400 hover:bg-rose-500/15'
-              : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300'
-          }`}
-        >
-          <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5">
-            <path d="M1 10s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-            <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
-            {!showMktCols && <line x1="3" y1="3" x2="17" y2="17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>}
-          </svg>
-          <span className="hidden sm:inline">{showMktCols ? 'Hide intel' : 'Show intel'}</span>
-        </button>
+          <button
+            onClick={() => setShowMktCols((v) => !v)}
+            title={showMktCols ? 'Hide marketing intelligence columns' : 'Show marketing intelligence columns'}
+            className={`shrink-0 flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs transition ${
+              showMktCols
+                ? 'border-rose-500/40 bg-rose-500/10 text-rose-400 hover:bg-rose-500/15'
+                : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300'
+            }`}
+          >
+            <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5 shrink-0">
+              <path d="M1 10s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+              <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
+              {!showMktCols && <line x1="3" y1="3" x2="17" y2="17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>}
+            </svg>
+            <span className="hidden sm:inline">{showMktCols ? 'Hide intel' : 'Show intel'}</span>
+          </button>
+        </div>
       </div>
 
       <div className="mb-5 h-px bg-zinc-800" />

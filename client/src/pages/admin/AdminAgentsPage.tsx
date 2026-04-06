@@ -194,7 +194,7 @@ export default function AdminAgentsPage() {
       {/* Header */}
       <div className="mb-8">
         <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">Support Workspace</p>
-        <h1 className="text-2xl font-bold text-zinc-100">Agents</h1>
+        <h1 className="text-xl font-bold text-zinc-100 sm:text-2xl">Agents</h1>
         <p className="mt-1 text-sm text-zinc-500">Manage who has access to the support workspace.</p>
       </div>
 
@@ -221,7 +221,7 @@ export default function AdminAgentsPage() {
                 <thead>
                   <tr className="border-b border-zinc-800 bg-zinc-900/50">
                     <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Agent</th>
-                    <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Role</th>
+                    <th className="hidden sm:table-cell px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Role</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
@@ -282,7 +282,7 @@ export default function AdminAgentsPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3.5">
+                        <td className="hidden sm:table-cell px-4 py-3.5">
                           {isAi ? (
                             <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-semibold text-violet-400">
                               ✦ AI Agent

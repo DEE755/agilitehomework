@@ -1432,7 +1432,7 @@ export default function AdminTicketDetailPage() {
         ← Back to Queue
       </Link>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* ── Left: ticket + thread ── */}
         <div className="lg:col-span-2 space-y-6">
           {/* Ticket card */}
@@ -1459,7 +1459,7 @@ export default function AdminTicketDetailPage() {
                       }
                     </div>
                   )}
-                  <h1 className="text-xl font-bold text-zinc-100">{parsed.title}</h1>
+                  <h1 className="text-lg font-bold text-zinc-100 sm:text-xl">{parsed.title}</h1>
                 </div>
                 <div className="flex gap-2">
                   <StatusBadge status={ticket.status} />
@@ -1575,7 +1575,7 @@ export default function AdminTicketDetailPage() {
         </div>
 
         {/* ── Right: management panel ── */}
-        <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+        <div className="space-y-4 md:sticky md:top-4 md:self-start">
           {/* Status */}
           <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-600">Status</p>

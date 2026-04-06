@@ -67,10 +67,9 @@ const STATUS_COLORS: Record<string, string> = {
 
 type TicketViewMode = 'assigned' | 'status';
 
-function TicketGroup({ label, tickets, selected, onAdd, onClose, showAssignee }: {
+function TicketGroup({ label, tickets, onAdd, onClose, showAssignee }: {
   label: string;
   tickets: AdminTicketSummary[];
-  selected: string[];
   onAdd: (ref: AgentMessageTicketRef) => void;
   onClose: () => void;
   showAssignee?: boolean;
@@ -195,9 +194,9 @@ function TicketPicker({
 
         {!isEmpty && view === 'assigned' && (
           <>
-            <TicketGroup label="My Tickets"              tickets={mine}    selected={selected} onAdd={onAdd} onClose={onClose} />
-            <TicketGroup label={`${partnerName}'s Tickets`} tickets={partner} selected={selected} onAdd={onAdd} onClose={onClose} />
-            <TicketGroup label="Others"                  tickets={others}  selected={selected} onAdd={onAdd} onClose={onClose} showAssignee />
+            <TicketGroup label="My Tickets"              tickets={mine}    onAdd={onAdd} onClose={onClose} />
+            <TicketGroup label={`${partnerName}'s Tickets`} tickets={partner} onAdd={onAdd} onClose={onClose} />
+            <TicketGroup label="Others"                  tickets={others}  onAdd={onAdd} onClose={onClose} showAssignee />
           </>
         )}
 
@@ -207,7 +206,6 @@ function TicketPicker({
               key={s}
               label={statusLabel[s] ?? s}
               tickets={byStatus[s]}
-              selected={selected}
               onAdd={onAdd}
               onClose={onClose}
               showAssignee
@@ -440,7 +438,6 @@ function ProductPreview({ productRef, onClose }: { productRef: AgentMessageProdu
         <div className="p-5 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <h3 className="font-semibold text-zinc-100">{name}</h3>
-            {product?.price != null && <span className="shrink-0 font-semibold text-olive-400">${product.price}</span>}
           </div>
           {product?.description && (
             <p className="text-sm leading-relaxed text-zinc-400 line-clamp-3">{product.description}</p>
