@@ -278,18 +278,6 @@ export default function AdminAgentsPage() {
                         </td>
                         <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex flex-col items-end gap-1.5">
-                            {/* Message button — non-self, non-AI */}
-                            {!isAi && !isSelf && (
-                              <button
-                                onClick={() => setMsgTarget({ _id: agent._id, name: agent.name, avatarUrl: agent.avatarUrl })}
-                                className="rounded border border-zinc-800 p-1.5 text-zinc-600 transition hover:border-sky-500/30 hover:text-sky-400"
-                                title={`Message ${agent.name}`}
-                              >
-                                <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
-                                  <path d="M14 8.5c0 3-2.686 5.5-6 5.5a6.16 6.16 0 01-2.917-.726L2 14l.726-3.083A5.285 5.285 0 012 8.5C2 5.5 4.686 3 8 3s6 2.5 6 5.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-                                </svg>
-                              </button>
-                            )}
                             {/* Admin actions */}
                             {isAdmin && !isAi && !isSelf && (
                               <div className="flex items-center gap-2">
@@ -451,14 +439,27 @@ export default function AdminAgentsPage() {
                   <p className="text-[10px] text-zinc-600">{activityAgent?.agent.email}</p>
                 </div>
               </div>
-              <button
-                onClick={() => { setActivityAgent(null); setActivityLoading(false); }}
-                className="text-zinc-600 transition hover:text-zinc-300"
-              >
-                <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4">
-                  <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-              </button>
+              <div className="flex items-center gap-2">
+                {activityAgent && !activityAgent.agent.isAiAgent && activityAgent.agent._id !== currentAgent?._id && (
+                  <button
+                    onClick={() => setMsgTarget({ _id: activityAgent.agent._id, name: activityAgent.agent.name, avatarUrl: activityAgent.agent.avatarUrl })}
+                    className="flex items-center gap-1.5 rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1 text-[11px] font-semibold text-sky-400 transition hover:bg-sky-500/20"
+                  >
+                    <svg viewBox="0 0 14 14" fill="none" className="h-3 w-3">
+                      <path d="M12 7c0 2.8-2.25 5-5 5a4.97 4.97 0 01-2.5-.66L2 12l.66-2.5A4.97 4.97 0 012 7c0-2.8 2.25-5 5-5s5 2.2 5 5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+                    </svg>
+                    Chat with {activityAgent.agent.name.split(' ')[0]}
+                  </button>
+                )}
+                <button
+                  onClick={() => { setActivityAgent(null); setActivityLoading(false); }}
+                  className="text-zinc-600 transition hover:text-zinc-300"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4">
+                    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {activityLoading && (

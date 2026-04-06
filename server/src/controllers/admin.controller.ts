@@ -356,7 +356,8 @@ export async function getAgentActivity(req: Request, res: Response): Promise<voi
     aiRatedAt:            agent.aiRatedAt ?? null,
     manualRating:         agent.manualRating ?? null,
   };
-  res.json({ data: { agent, stats, assignedTickets, recentReplies: repliesData, rating } });
+  const avatarUrl = agent.avatarKey ? (await getObjectUrl(agent.avatarKey)) ?? null : null;
+  res.json({ data: { agent: { ...agent, avatarUrl }, stats, assignedTickets, recentReplies: repliesData, rating } });
 }
 
 // POST /api/admin/agents/:agentId/resend-invite  (admin only)
