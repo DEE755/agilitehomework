@@ -77,7 +77,8 @@ export default function AdminAgentsPage() {
       const res = await adminApi.getAgentActivity(id);
       setActivityAgent(res.data);
       setAiRating(res.data.rating);
-      setManualStars(res.data.rating?.manualRating ?? 0);
+      // Final Rating defaults to manualRating if set, otherwise seeds from AI rating
+      setManualStars(res.data.rating?.manualRating ?? res.data.rating?.aiRating ?? 0);
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Failed to load activity', 'error');
     } finally {
@@ -91,6 +92,8 @@ export default function AdminAgentsPage() {
     try {
       const res = await adminApi.aiRateAgent(activityAgent.agent._id);
       setAiRating(res.data);
+      // Seed Final Rating from AI if not already manually set
+      setManualStars((prev) => prev > 0 ? prev : (res.data.aiRating ?? 0));
       toast('AI rating generated', 'success');
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Rating failed', 'error');
@@ -488,110 +491,125 @@ export default function AdminAgentsPage() {
                   ))}
                 </div>
 
-                {/* ── AI Performance Rating ───────────────────────────────── */}
+                {/* ── AI Rating ───────────────────────────────────────────── */}
                 {isAdmin && !activityAgent.agent.isAiAgent && (
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
-                    {/* Section header */}
-                    <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5 text-violet-400">
-                          <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                        </svg>
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Performance Rating</p>
+                  <div className="space-y-3">
+
+                    {/* Block 1 — AI-generated, read-only */}
+                    <div className="rounded-xl border border-violet-500/20 bg-zinc-900 overflow-hidden">
+                      <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5 text-violet-400">
+                            <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                          </svg>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-400">AI Rating</p>
+                          <span className="text-[9px] text-zinc-600 font-normal normal-case tracking-normal">— read only</span>
+                        </div>
+                        <button
+                          onClick={() => void handleAiRate()}
+                          disabled={aiRating_busy}
+                          className="flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[11px] font-semibold text-violet-400 transition hover:bg-violet-500/20 disabled:opacity-50"
+                        >
+                          {aiRating_busy ? (
+                            <>
+                              <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31" strokeDashoffset="10"/>
+                              </svg>
+                              Analyzing…
+                            </>
+                          ) : (
+                            <>
+                              <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5">
+                                <path d="M6 1l1 3h3l-2.5 2 1 3L6 7.5 3.5 9l1-3L2 4h3z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round"/>
+                              </svg>
+                              {aiRating?.aiRating ? 'Re-rate with AI' : 'Rate with AI'}
+                            </>
+                          )}
+                        </button>
                       </div>
-                      <button
-                        onClick={() => void handleAiRate()}
-                        disabled={aiRating_busy}
-                        className="flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[11px] font-semibold text-violet-400 transition hover:bg-violet-500/20 disabled:opacity-50"
-                      >
-                        {aiRating_busy ? (
+
+                      <div className="p-4 space-y-4">
+                        {aiRating?.aiRating ? (
                           <>
-                            <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
-                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31" strokeDashoffset="10"/>
-                            </svg>
-                            Analyzing…
+                            {/* Stars — NOT interactive */}
+                            <div className="flex items-center gap-3">
+                              <div className="flex gap-0.5">
+                                {[1,2,3,4,5].map((n) => (
+                                  <svg key={n} viewBox="0 0 16 16" className={`h-5 w-5 ${n <= (aiRating.aiRating ?? 0) ? 'text-violet-400' : 'text-zinc-700'}`}>
+                                    <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" fill="currentColor"/>
+                                  </svg>
+                                ))}
+                              </div>
+                              <span className="text-2xl font-bold text-zinc-100">{aiRating.aiRating}<span className="text-sm font-normal text-zinc-500">/5</span></span>
+                              {aiRating.aiRatedAt && (
+                                <span className="ml-auto text-[10px] text-zinc-600">
+                                  {new Date(aiRating.aiRatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
+                              )}
+                            </div>
+
+                            {aiRating.aiRatingExplanation && (
+                              <p className="text-xs text-zinc-400 leading-relaxed border-l-2 border-violet-500/30 pl-3">
+                                {aiRating.aiRatingExplanation}
+                              </p>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-3">
+                              {aiRating.aiRatingStrengths?.length > 0 && (
+                                <div>
+                                  <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-600">
+                                    <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    Strengths
+                                  </p>
+                                  <ul className="space-y-1">
+                                    {aiRating.aiRatingStrengths.map((s, i) => (
+                                      <li key={i} className="flex gap-1.5 text-[11px] text-zinc-400">
+                                        <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-emerald-500/60" />
+                                        {s}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {aiRating.aiRatingImprovements?.length > 0 && (
+                                <div>
+                                  <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-amber-600">
+                                    <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5"><path d="M6 2v4M6 8v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                                    To improve
+                                  </p>
+                                  <ul className="space-y-1">
+                                    {aiRating.aiRatingImprovements.map((s, i) => (
+                                      <li key={i} className="flex gap-1.5 text-[11px] text-zinc-400">
+                                        <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-amber-500/60" />
+                                        {s}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
                           </>
                         ) : (
-                          <>
-                            <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5">
-                              <path d="M6 1l1 3h3l-2.5 2 1 3L6 7.5 3.5 9l1-3L2 4h3z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round"/>
-                            </svg>
-                            {aiRating?.aiRating ? 'Re-rate with AI' : 'Rate with AI'}
-                          </>
+                          <p className="text-xs text-zinc-600 py-1">
+                            No AI assessment yet — click "Rate with AI" to generate one based on this agent's ticket history and replies.
+                          </p>
                         )}
-                      </button>
+                      </div>
                     </div>
 
-                    <div className="p-4 space-y-4">
-                      {/* AI star score */}
-                      {aiRating?.aiRating ? (
-                        <>
-                          <div className="flex items-center gap-3">
-                            <div className="flex gap-0.5">
-                              {[1,2,3,4,5].map((n) => (
-                                <svg key={n} viewBox="0 0 16 16" className={`h-5 w-5 ${n <= (aiRating.aiRating ?? 0) ? 'text-amber-400' : 'text-zinc-700'}`}>
-                                  <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" fill="currentColor"/>
-                                </svg>
-                              ))}
-                            </div>
-                            <span className="text-2xl font-bold text-zinc-100">{aiRating.aiRating}<span className="text-sm font-normal text-zinc-500">/5</span></span>
-                            {aiRating.aiRatedAt && (
-                              <span className="ml-auto text-[10px] text-zinc-600">
-                                {new Date(aiRating.aiRatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                              </span>
-                            )}
-                          </div>
-
-                          {aiRating.aiRatingExplanation && (
-                            <p className="text-xs text-zinc-400 leading-relaxed border-l-2 border-violet-500/30 pl-3">
-                              {aiRating.aiRatingExplanation}
-                            </p>
-                          )}
-
-                          <div className="grid grid-cols-2 gap-3">
-                            {aiRating.aiRatingStrengths?.length > 0 && (
-                              <div>
-                                <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-600">
-                                  <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                  Strengths
-                                </p>
-                                <ul className="space-y-1">
-                                  {aiRating.aiRatingStrengths.map((s, i) => (
-                                    <li key={i} className="flex gap-1.5 text-[11px] text-zinc-400">
-                                      <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-emerald-500/60" />
-                                      {s}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            {aiRating.aiRatingImprovements?.length > 0 && (
-                              <div>
-                                <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-amber-600">
-                                  <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5"><path d="M6 2v4M6 8v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
-                                  To improve
-                                </p>
-                                <ul className="space-y-1">
-                                  {aiRating.aiRatingImprovements.map((s, i) => (
-                                    <li key={i} className="flex gap-1.5 text-[11px] text-zinc-400">
-                                      <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-amber-500/60" />
-                                      {s}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        </>
-                      ) : (
-                        <p className="text-xs text-zinc-600 py-2">
-                          No AI assessment yet — click "Rate with AI" to generate one based on this agent's ticket history and replies.
-                        </p>
-                      )}
-
-                      {/* Overall rating */}
-                      <div className="border-t border-zinc-800 pt-4">
-                        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Overall Rating</p>
+                    {/* Block 2 — Final Rating, manually editable */}
+                    <div className="rounded-xl border border-amber-500/20 bg-zinc-900 overflow-hidden">
+                      <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+                        <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5 text-amber-400">
+                          <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" fill="currentColor"/>
+                        </svg>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">Final Rating</p>
+                        <span className="text-[9px] text-zinc-600 font-normal normal-case tracking-normal">— your call, editable</span>
+                        {aiRating?.aiRating && manualStars === aiRating.aiRating && !aiRating.manualRating && (
+                          <span className="ml-auto text-[9px] text-zinc-600 italic">pre-filled from AI</span>
+                        )}
+                      </div>
+                      <div className="p-4">
                         <div className="flex items-center gap-3">
                           <div className="flex gap-0.5">
                             {[1,2,3,4,5].map((n) => (
@@ -600,12 +618,9 @@ export default function AdminAgentsPage() {
                                 onMouseEnter={() => setHoverStar(n)}
                                 onMouseLeave={() => setHoverStar(0)}
                                 onClick={() => setManualStars(n)}
-                                className="transition"
                               >
-                                <svg viewBox="0 0 16 16" className={`h-5 w-5 transition ${
-                                  n <= (hoverStar || manualStars)
-                                    ? 'text-amber-400'
-                                    : 'text-zinc-700 hover:text-zinc-500'
+                                <svg viewBox="0 0 16 16" className={`h-6 w-6 transition ${
+                                  n <= (hoverStar || manualStars) ? 'text-amber-400' : 'text-zinc-700 hover:text-zinc-500'
                                 }`}>
                                   <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" fill="currentColor"/>
                                 </svg>
@@ -613,20 +628,26 @@ export default function AdminAgentsPage() {
                             ))}
                           </div>
                           {manualStars > 0 && (
-                            <button
-                              onClick={() => void handleSaveManualRating()}
-                              disabled={savingManual}
-                              className="rounded-full border border-zinc-700 px-3 py-1 text-[11px] font-semibold text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-40"
-                            >
-                              {savingManual ? 'Saving…' : 'Save'}
-                            </button>
+                            <span className="text-sm font-bold text-zinc-100 tabular-nums">
+                              {manualStars}<span className="text-xs font-normal text-zinc-500">/5</span>
+                            </span>
                           )}
-                          {aiRating?.manualRating && manualStars === aiRating.manualRating && (
-                            <span className="text-[10px] text-zinc-600">Saved</span>
-                          )}
+                          <button
+                            onClick={() => void handleSaveManualRating()}
+                            disabled={savingManual || manualStars < 1}
+                            className="ml-auto rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold text-amber-400 transition hover:bg-amber-500/20 disabled:opacity-40"
+                          >
+                            {savingManual ? 'Saving…' : 'Save Final Rating'}
+                          </button>
                         </div>
+                        {aiRating?.manualRating && (
+                          <p className="mt-2 text-[10px] text-zinc-600">
+                            Last saved: {aiRating.manualRating}/5
+                          </p>
+                        )}
                       </div>
                     </div>
+
                   </div>
                 )}
 
