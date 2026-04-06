@@ -941,7 +941,7 @@ Operational / Vendor Metrics:
 - Open tickets with zero replies (never been responded to): ${input.noReplyOpenCount} (${responseGapPct}% of open tickets)
 `.trim();
 
-  const raw = await chatCompletion(INSIGHTS_SYSTEM_PROMPT, context, 45_000);
+  const raw = await chatCompletion(INSIGHTS_SYSTEM_PROMPT, context, 120_000);
 
   type Raw = {
     storeHealthScore?: unknown;

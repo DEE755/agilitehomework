@@ -247,7 +247,9 @@ export default function InsightsPanel({ open, onClose }: Props) {
       setCached((res.cached ?? false) && !refresh);
       if (refresh) await loadHistory();
     } catch (e) {
+      // Generation failed — surface error and stop polling
       setError(e instanceof Error ? e.message : 'Failed to generate insights');
+      if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
     } finally {
       if (!pollRef.current) setLoading(false);
     }

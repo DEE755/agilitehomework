@@ -505,11 +505,13 @@ interface InsightsCache {
 }
 let insightsCache: InsightsCache | null = null;
 let insightsGenerating = false;
+let insightsError: string | null = null;
 const INSIGHTS_CACHE_TTL_MS = 30 * 60 * 1000;
 
 async function runInsightsGeneration(force: boolean): Promise<void> {
   if (insightsGenerating) return;
   insightsGenerating = true;
+  insightsError = null;
   try {
     const tickets = await Ticket.find()
       .select('status aiPriority aiSummary aiTags mktSentiment mktArchetype mktArchetypeLabel mktRefundIntent mktChurnRisk mktLifetimeValueSignal mktProfiledAt aiTriagedAt')
@@ -592,7 +594,8 @@ async function runInsightsGeneration(force: boolean): Promise<void> {
       } catch { /* non-critical */ }
     })();
   } catch (e) {
-    console.error('[insights] generation failed:', e instanceof Error ? e.message : e);
+    insightsError = e instanceof Error ? e.message : 'Failed to generate insights';
+    console.error('[insights] generation failed:', insightsError);
   } finally {
     insightsGenerating = false;
   }
@@ -605,6 +608,13 @@ export async function getAiInsights(req: Request, res: Response): Promise<void> 
   if (!force && insightsCache && insightsCache.expiresAt > Date.now()) {
     res.json({ data: insightsCache.data, generatedAt: insightsCache.generatedAt, cached: true });
     return;
+  }
+
+  // If previous attempt failed, surface the error (allow retry via ?refresh=true)
+  if (!insightsGenerating && insightsError) {
+    const err = insightsError;
+    if (force) insightsError = null; // reset on explicit refresh
+    else { res.status(500).json({ error: err }); return; }
   }
 
   // Kick off background generation and return immediately
