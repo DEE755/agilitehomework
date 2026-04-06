@@ -374,18 +374,27 @@ export async function deleteAgent(req: Request, res: Response): Promise<void> {
   res.json({ data: { deleted: true } });
 }
 
-// GET /api/admin/products
+// GET /api/admin/products — proxies the external catalog (same source as storefront)
 export async function listAdminProducts(_req: Request, res: Response): Promise<void> {
-  const products = await Product.find({ isActive: true }).sort({ sortOrder: 1, name: 1 }).lean();
+  const upstream = await fetch('https://api.escuelajs.co/api/v1/products?limit=20');
+  if (!upstream.ok) { res.status(502).json({ error: 'Product catalog unavailable' }); return; }
 
-  const data = products.map((p) => ({
-    _id:         String(p._id),
-    name:        p.name,
-    category:    p.category,
-    sku:         p.sku,
-    description: p.description,
-    imageUrl:    null,
-  }));
+  const CATEGORY_NAMES: Record<number, string> = { 1: 'Clothes', 2: 'Electronics', 3: 'Furniture', 4: 'Shoes', 5: 'Miscellaneous' };
+  function stripHtml(s: string) { return s.replace(/<[^>]*>/g, '').trim(); }
+
+  type ExtP = { id: number; title: string; price: number; description: string; category: { id: number }; images: string[] };
+  const raw = (await upstream.json()) as ExtP[];
+
+  const data = raw
+    .map((p) => ({
+      _id:         String(p.id),
+      name:        stripHtml(p.title ?? ''),
+      category:    CATEGORY_NAMES[p.category?.id] ?? 'Miscellaneous',
+      description: stripHtml(p.description ?? ''),
+      sku:         `EXT-${p.id}`,
+      imageUrl:    p.images?.[0] ?? null,
+    }))
+    .filter((p) => p.name && p.imageUrl);
 
   res.json({ data });
 }
