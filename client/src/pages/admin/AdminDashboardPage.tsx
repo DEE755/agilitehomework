@@ -221,6 +221,45 @@ const STATUS_OPTS: { label: string; value: StatusFilter }[] = [
   { label: 'Resolved',    value: 'resolved'    },
 ];
 
+const STATUS_STYLE: Record<StatusFilter, { pill: string; text: string }> = {
+  all:         { pill: 'bg-zinc-700/60',     text: 'text-zinc-200'   },
+  unresolved:  { pill: 'bg-amber-500/25',    text: 'text-amber-300'  },
+  new:         { pill: 'bg-olive-500/25',    text: 'text-olive-400'  },
+  in_progress: { pill: 'bg-sky-500/25',      text: 'text-sky-300'    },
+  resolved:    { pill: 'bg-violet-500/25',   text: 'text-violet-300' },
+};
+
+function StatusPillSelector({ value, onChange }: { value: StatusFilter; onChange: (v: StatusFilter) => void }) {
+  const activeIdx = STATUS_OPTS.findIndex((o) => o.value === value);
+  const count = STATUS_OPTS.length;
+  const { pill, text } = STATUS_STYLE[value];
+
+  return (
+    <div className="relative flex overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900 scrollbar-none">
+      {/* Animated sliding pill */}
+      <div
+        className={`pointer-events-none absolute inset-y-1 rounded-md transition-all duration-300 ease-in-out ${pill}`}
+        style={{
+          width: `${100 / count}%`,
+          left: `${(activeIdx / count) * 100}%`,
+        }}
+      />
+      {/* Tab buttons */}
+      {STATUS_OPTS.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          className={`relative z-10 flex-1 whitespace-nowrap px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors duration-200 ${
+            value === opt.value ? text : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminDashboardPage() {
   const currentAgentId = getStoredAgent()?._id;
   const [tickets, setTickets]   = useState<AdminTicketSummary[]>([]);
@@ -343,22 +382,8 @@ export default function AdminDashboardPage() {
 
       {/* Filters */}
       <div className="mb-5 flex flex-wrap gap-2">
-        {/* Status tabs */}
-        <div className="flex overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900 p-1 scrollbar-none">
-          {STATUS_OPTS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setStatus(opt.value)}
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition ${
-                status === opt.value
-                  ? 'bg-olive-500/20 text-olive-400 ring-1 ring-olive-500/30'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+        {/* Status tabs — sliding pill selector */}
+        <StatusPillSelector value={status} onChange={setStatus} />
 
         {/* Priority */}
         <select

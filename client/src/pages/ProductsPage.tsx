@@ -216,7 +216,9 @@ export default function ProductsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { products: allProducts, loading, error, reload } = useProducts();
-  const products = allProducts.filter((p) => p.isActive !== false);
+  const products = allProducts.filter(
+    (p) => p.isActive !== false && !p.name.toLowerCase().includes('produ'),
+  );
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState<PageSize>(8);

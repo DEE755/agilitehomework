@@ -146,3 +146,73 @@
 #admin-root.admin-light .hover\:bg-zinc-900\/60:hover { background-color: rgba(228,228,231,0.6) !important; }
 #admin-root.admin-light .hover\:bg-zinc-800:hover     { background-color: #d4d4d8 !important; }
 #admin-root.admin-light .hover\:border-zinc-700:hover { border-color: #a1a1aa !important; }
+
+/* ── Theme decorations — particle animations ──────────────────────────────── */
+@keyframes particle-float-up {
+  0%   { transform: translateY(0)      translateX(0)               rotate(0deg);              opacity: 0; }
+  8%   { opacity: 0.75; }
+  82%  { opacity: 0.5; }
+  100% { transform: translateY(-108vh) translateX(var(--drift, 0px)) rotate(var(--rotate, 180deg)); opacity: 0; }
+}
+@keyframes particle-fall-down {
+  0%   { transform: translateY(0)      translateX(0)               rotate(0deg);               opacity: 0; }
+  8%   { opacity: 0.75; }
+  82%  { opacity: 0.5; }
+  100% { transform: translateY(108vh)  translateX(var(--drift, 0px)) rotate(var(--rotate, -180deg)); opacity: 0; }
+}
+
+.particle-float-up {
+  position: absolute;
+  bottom: -8%;
+  user-select: none;
+  animation: particle-float-up var(--dur, 15s) ease-in-out var(--delay, 0s) infinite;
+}
+.particle-fall-down {
+  position: absolute;
+  top: -8%;
+  user-select: none;
+  animation: particle-fall-down var(--dur, 15s) ease-in-out var(--delay, 0s) infinite;
+}
+
+/* ── Customer light mode ──────────────────────────────────────────────────── */
+/* Scoped to #storefront-root so the admin panel is never affected.           */
+/* Palette: warm slate tones — avoids pure-white harshness while keeping      */
+/* enough contrast to be readable. Inspired by Linear / Vercel light mode.    */
+#storefront-root.customer-light {
+  background-color: #f2f2f0;   /* warm off-white, not glaring */
+  color-scheme: light;
+}
+#storefront-root.customer-light ::-webkit-scrollbar-track { background: #e8e8e4; }
+#storefront-root.customer-light ::-webkit-scrollbar-thumb { background: #b0b0a8; }
+
+/* Backgrounds: zinc-950 → card white, zinc-900 → slightly warmer, zinc-800 → subtle divide */
+#storefront-root.customer-light .bg-zinc-950      { background-color: #fafaf8 !important; }
+#storefront-root.customer-light .bg-zinc-950\/95  { background-color: rgba(250,250,248,0.97) !important; }
+#storefront-root.customer-light .bg-zinc-900      { background-color: #efefe9 !important; }
+#storefront-root.customer-light .bg-zinc-900\/60  { background-color: rgba(239,239,233,0.8) !important; }
+#storefront-root.customer-light .bg-zinc-900\/40  { background-color: rgba(239,239,233,0.6) !important; }
+#storefront-root.customer-light .bg-zinc-800      { background-color: #e3e3dc !important; }
+#storefront-root.customer-light .bg-zinc-700      { background-color: #d1d1c8 !important; }
+
+/* Borders: softer dividers, not too sharp */
+#storefront-root.customer-light .border-zinc-800  { border-color: #deded5 !important; }
+#storefront-root.customer-light .border-zinc-700  { border-color: #c8c8be !important; }
+
+/* Text: warm slate scale — readable without being harsh */
+#storefront-root.customer-light .text-zinc-100    { color: #1a1a16 !important; }  /* near-black */
+#storefront-root.customer-light .text-zinc-200    { color: #2a2a24 !important; }
+#storefront-root.customer-light .text-zinc-300    { color: #3d3d35 !important; }
+#storefront-root.customer-light .text-zinc-400    { color: #56564c !important; }
+#storefront-root.customer-light .text-zinc-500    { color: #74746a !important; }
+#storefront-root.customer-light .text-zinc-600    { color: #74746a !important; }
+#storefront-root.customer-light .text-zinc-700    { color: #56564c !important; }
+
+/* Placeholder text */
+#storefront-root.customer-light .placeholder\:text-zinc-600::placeholder { color: #a0a098 !important; }
+
+/* Hover states */
+#storefront-root.customer-light .hover\:text-zinc-300:hover   { color: #2a2a24 !important; }
+#storefront-root.customer-light .hover\:text-zinc-200:hover   { color: #1a1a16 !important; }
+#storefront-root.customer-light .hover\:text-zinc-100:hover   { color: #1a1a16 !important; }
+#storefront-root.customer-light .hover\:border-zinc-700:hover { border-color: #c8c8be !important; }
+#storefront-root.customer-light .hover\:bg-zinc-800:hover     { background-color: #e3e3dc !important; }

@@ -2,7 +2,12 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 
-export default function Navbar() {
+interface NavbarProps {
+  isDark: boolean;
+  onThemeToggle: () => void;
+}
+
+export default function Navbar({ isDark, onThemeToggle }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { t, lang, toggleLang } = useLanguage();
 
@@ -69,6 +74,15 @@ export default function Navbar() {
             {lang === 'en' ? t.nav.switchToHe : t.nav.switchToEn}
           </button>
 
+          {/* Dark / light toggle */}
+          <button
+            onClick={onThemeToggle}
+            className="ms-1 rounded border border-zinc-800 px-2.5 py-1.5 text-[11px] text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300"
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDark ? '☀' : '🌙'}
+          </button>
+
           <NavLink
             to="/admin/login"
             className="ms-1 rounded px-2 py-1.5 text-[10px] text-zinc-700 transition hover:text-zinc-400"
@@ -128,6 +142,13 @@ export default function Navbar() {
               className="mt-1 rounded border border-zinc-800 px-3 py-2 text-sm font-bold text-zinc-500 transition hover:text-zinc-300 text-center"
             >
               {lang === 'en' ? `עברית` : 'English'}
+            </button>
+            {/* Dark / light toggle mobile */}
+            <button
+              onClick={() => { onThemeToggle(); setMobileOpen(false); }}
+              className="mt-1 rounded border border-zinc-800 px-3 py-2 text-sm text-zinc-500 transition hover:text-zinc-300 text-center"
+            >
+              {isDark ? '☀ Light mode' : '🌙 Dark mode'}
             </button>
           </nav>
         </div>

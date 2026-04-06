@@ -1,3 +1,9 @@
+export interface ThemeDecorations {
+  emojis: string[];
+  count: number;
+  animation: 'float-up' | 'fall-down';
+}
+
 export interface SeasonalTheme {
   id: string;
   name: string;
@@ -7,6 +13,8 @@ export interface SeasonalTheme {
   banner: { text: string; gradient: string } | null;
   /** CSS custom property overrides applied to <html data-theme="id"> */
   vars: Record<string, string>;
+  /** Optional ambient particle decorations rendered over the storefront */
+  decorations?: ThemeDecorations;
 }
 
 export const THEMES: SeasonalTheme[] = [
@@ -30,6 +38,11 @@ export const THEMES: SeasonalTheme[] = [
     banner: {
       text: 'Hag Purim Sameach! Shop our festive collection.',
       gradient: 'linear-gradient(90deg, rgba(91,33,182,0.95) 0%, rgba(126,34,206,0.9) 45%, rgba(219,39,119,0.85) 100%)',
+    },
+    decorations: {
+      emojis: ['🎭', '🎉', '🎊', '🌟', '⭐', '🎈'],
+      count: 18,
+      animation: 'fall-down',
     },
     vars: {
       '--th-accent':       '#a855f7',
@@ -57,6 +70,11 @@ export const THEMES: SeasonalTheme[] = [
       text: 'Hag Pesach Sameach! Fresh picks for the seder table.',
       gradient: 'linear-gradient(90deg, rgba(20,83,45,0.95) 0%, rgba(22,163,74,0.8) 55%, rgba(202,138,4,0.7) 100%)',
     },
+    decorations: {
+      emojis: ['🌿', '🌸', '🌱', '🍃', '🌾'],
+      count: 12,
+      animation: 'fall-down',
+    },
     vars: {
       '--th-accent':       '#4ade80',
       '--th-accent-dim':   'rgba(74,222,128,0.12)',
@@ -82,6 +100,11 @@ export const THEMES: SeasonalTheme[] = [
     banner: {
       text: "Happy Independence Day! יום העצמאות שמח",
       gradient: 'linear-gradient(90deg, rgba(10,37,140,0.97) 0%, rgba(29,78,216,0.9) 50%, rgba(10,37,140,0.97) 100%)',
+    },
+    decorations: {
+      emojis: ['🇮🇱', '✡️', '🕍', '🇮🇱', '🇮🇱'],
+      count: 14,
+      animation: 'float-up',
     },
     vars: {
       '--th-accent':       '#3b82f6',
@@ -135,6 +158,11 @@ export const THEMES: SeasonalTheme[] = [
       text: 'Shana Tova! 🍎 Wishing you a sweet new year.',
       gradient: 'linear-gradient(90deg, rgba(120,53,15,0.97) 0%, rgba(180,83,9,0.88) 50%, rgba(133,77,14,0.95) 100%)',
     },
+    decorations: {
+      emojis: ['🍎', '🍯', '🌟', '✨', '🍁'],
+      count: 12,
+      animation: 'fall-down',
+    },
     vars: {
       '--th-accent':       '#f59e0b',
       '--th-accent-dim':   'rgba(245,158,11,0.14)',
@@ -187,6 +215,11 @@ export const THEMES: SeasonalTheme[] = [
       text: 'Happy Hanukkah! חנוכה שמח — Shine bright this season.',
       gradient: 'linear-gradient(90deg, rgba(7,31,133,0.97) 0%, rgba(29,78,216,0.88) 55%, rgba(180,83,9,0.65) 100%)',
     },
+    decorations: {
+      emojis: ['✨', '🕎', '⭐', '🌟', '💫'],
+      count: 14,
+      animation: 'float-up',
+    },
     vars: {
       '--th-accent':       '#fbbf24',
       '--th-accent-dim':   'rgba(251,191,36,0.13)',
@@ -212,6 +245,11 @@ export const THEMES: SeasonalTheme[] = [
     banner: {
       text: "Tu B'Av — Share love with something special.",
       gradient: 'linear-gradient(90deg, rgba(136,19,55,0.97) 0%, rgba(190,24,93,0.88) 50%, rgba(157,23,77,0.9) 100%)',
+    },
+    decorations: {
+      emojis: ['🌹', '❤️', '🌸', '💕', '🌷', '💗'],
+      count: 16,
+      animation: 'fall-down',
     },
     vars: {
       '--th-accent':       '#ec4899',
@@ -265,6 +303,11 @@ export const THEMES: SeasonalTheme[] = [
       text: "Happy Valentine's Day! Give the gift of quality.",
       gradient: 'linear-gradient(90deg, rgba(136,19,55,0.97) 0%, rgba(190,18,60,0.88) 50%, rgba(159,18,57,0.9) 100%)',
     },
+    decorations: {
+      emojis: ['❤️', '🌹', '💝', '💖', '🌷', '💗', '🥀'],
+      count: 18,
+      animation: 'fall-down',
+    },
     vars: {
       '--th-accent':       '#f43f5e',
       '--th-accent-dim':   'rgba(244,63,94,0.12)',
@@ -289,6 +332,7 @@ export function getTheme(id: string | null | undefined): SeasonalTheme {
 }
 
 export const STOREFRONT_THEME_KEY = 'storefront_theme';
+export const CUSTOMER_UI_THEME_KEY = 'customer_ui_theme';
 
 /** Apply or remove CSS custom properties on <html> */
 export function applyTheme(id: string) {

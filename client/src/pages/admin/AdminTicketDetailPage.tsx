@@ -1620,17 +1620,34 @@ export default function AdminTicketDetailPage() {
 
           {/* Assign */}
           <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-600">Assigned To</p>
-              {currentAgentId && ticket.assignedTo?._id !== currentAgentId && (
-                <button
-                  onClick={() => void handleAssign(currentAgentId)}
-                  disabled={assigning}
-                  className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-[10px] font-semibold text-zinc-400 transition hover:border-olive-500/40 hover:text-olive-300 disabled:opacity-40"
-                >
-                  Assign myself
-                </button>
-              )}
+              <div className="flex items-center gap-1.5">
+                {currentAgentId && ticket.assignedTo?._id !== currentAgentId && (
+                  <button
+                    onClick={() => void handleAssign(currentAgentId)}
+                    disabled={assigning}
+                    className="rounded border border-zinc-700 bg-zinc-800 px-2 py-1 text-[10px] font-semibold text-zinc-400 transition hover:border-olive-500/40 hover:text-olive-300 disabled:opacity-40"
+                  >
+                    Assign myself
+                  </button>
+                )}
+                {(() => {
+                  const aiAgent = agents.find((a) => a.isAiAgent);
+                  if (!aiAgent || ticket.assignedTo?._id === aiAgent._id) return null;
+                  return (
+                    <button
+                      onClick={() => {
+                        setPendingAgentId(aiAgent._id);
+                      }}
+                      disabled={assigning}
+                      className="rounded border border-violet-500/30 bg-violet-500/10 px-2 py-1 text-[10px] font-semibold text-violet-400 transition hover:bg-violet-500/15 disabled:opacity-40"
+                    >
+                      ✦ Assign AI
+                    </button>
+                  );
+                })()}
+              </div>
             </div>
             <select
               value={pendingAgentId ?? ticket.assignedTo?._id ?? ''}

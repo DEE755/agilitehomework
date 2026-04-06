@@ -238,9 +238,9 @@ function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate, adminTheme, onT
             </div>
           </div>
 
-          {/* Preferences */}
+          {/* Personal preferences */}
           <div className="border-t border-zinc-800/60 pt-4 space-y-4">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-600">Preferences</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-600">Personal Preferences</p>
 
             {/* Language */}
             <div className="flex items-center justify-between">
@@ -389,11 +389,22 @@ export default function AdminLayout() {
               <NavLink to="/admin/agents" className={({ isActive }) => `rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition ${isActive ? 'text-olive-400' : 'text-zinc-500 hover:text-zinc-200'}`}>
                 Agents
               </NavLink>
+              {agent?.role === 'admin' && (
+                <button
+                  onClick={() => setInsightsOpen(true)}
+                  className="flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500 transition hover:text-violet-400"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3">
+                    <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                  </svg>
+                  AI Insights
+                </button>
+              )}
             </nav>
           </div>
 
           {/* Right side */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {/* Mobile hamburger */}
             <button
               className="flex flex-col gap-1 p-1.5 sm:hidden"
@@ -404,33 +415,36 @@ export default function AdminLayout() {
               <span className={`block h-0.5 w-5 bg-zinc-400 transition-all ${mobileNavOpen ? 'opacity-0' : ''}`} />
               <span className={`block h-0.5 w-5 bg-zinc-400 transition-all ${mobileNavOpen ? '-translate-y-1.5 -rotate-45' : ''}`} />
             </button>
-            <span className="hidden rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500 sm:inline-flex">
-              Internal Staff Portal
-            </span>
-            <Link to="/products" className="hidden rounded border border-zinc-800 px-2.5 py-1.5 text-xs font-medium text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300 sm:block">
-              Customer Portal
-            </Link>
-            <button
-              onClick={() => setInsightsOpen(true)}
-              className="hidden items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-xs font-semibold text-violet-400 transition hover:bg-violet-500/15 sm:flex"
-              title="AI Insights"
-            >
-              <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
-                <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-              </svg>
-              AI Insights
-            </button>
-            <NotificationBell />
-            {agent?.role === 'admin' && <button
-              onClick={() => setSettingsOpen(true)}
-              className="rounded border border-zinc-800 p-1.5 text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300"
-              aria-label="Store configuration"
+
+            {/* Customer portal shortcut — icon-only */}
+            <Link
+              to="/products"
+              className="hidden rounded border border-zinc-800 p-1.5 text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300 sm:block"
+              title="Preview customer portal"
+              aria-label="Preview customer portal"
             >
               <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
-                <path d="M10 13a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M10 2v1.5M10 16.5V18M2 10h1.5M16.5 10H18M4.1 4.1l1.06 1.06M14.84 14.84l1.06 1.06M4.1 15.9l1.06-1.06M14.84 5.16l1.06-1.06" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M11 3H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M15 3h2v2M17 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-            </button>}
+            </Link>
+
+            <NotificationBell />
+
+            {/* Store configuration — admin only */}
+            {agent?.role === 'admin' && (
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="rounded border border-zinc-800 p-1.5 text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300"
+                title="Store Configuration — affects all customers & agents"
+                aria-label="Store configuration"
+              >
+                <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+                  <path d="M10 13a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M10 2v1.5M10 16.5V18M2 10h1.5M16.5 10H18M4.1 4.1l1.06 1.06M14.84 14.84l1.06 1.06M4.1 15.9l1.06-1.06M14.84 5.16l1.06-1.06" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </button>
+            )}
 
             {/* Agent identity — click to open profile panel */}
             <button
@@ -468,6 +482,14 @@ export default function AdminLayout() {
             >
               Agents
             </NavLink>
+            {agent?.role === 'admin' && (
+              <button
+                onClick={() => { setInsightsOpen(true); setMobileNavOpen(false); }}
+                className="rounded px-3 py-2.5 text-left text-sm font-medium text-zinc-400 transition hover:text-violet-400"
+              >
+                AI Insights
+              </button>
+            )}
             <Link
               to="/products"
               onClick={() => setMobileNavOpen(false)}
