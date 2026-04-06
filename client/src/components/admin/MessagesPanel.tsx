@@ -725,8 +725,20 @@ function ThreadView({
   }, [messages.length]);
 
   async function handleSend(body: string, ticketRefs: AgentMessageTicketRef[], productRefs: AgentMessageProductRef[]) {
+    // Optimistic update — show the message immediately without waiting for the server
+    const optimistic: AgentMessage = {
+      _id:         `optimistic-${Date.now()}`,
+      fromId:      myId,
+      toId:        partner._id,
+      body,
+      ticketRefs,
+      productRefs: productRefs.map((r) => ({ ...r })),
+      readAt:      null,
+      createdAt:   new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimistic]);
     await onSend(body, ticketRefs, productRefs);
-    await loadMessages();
+    await loadMessages(); // replaces optimistic message with server-confirmed one
   }
 
   return (
@@ -967,7 +979,7 @@ export default function MessagesPanel({ open, onClose, onUnreadChange, initialPa
   async function handleSend(body: string, ticketRefs: AgentMessageTicketRef[], productRefs: AgentMessageProductRef[]) {
     if (!activePartner) return;
     await adminApi.messages.send({ toId: activePartner._id, body, ticketRefs, productRefs });
-    await loadConversations();
+    void loadConversations(); // non-blocking — sidebar updates in background
   }
 
   function startNew(agent: Agent) {

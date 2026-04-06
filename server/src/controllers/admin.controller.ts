@@ -233,7 +233,7 @@ export async function agentReply(req: Request, res: Response): Promise<void> {
   await ticket.populate('assignedTo', 'name email isAiAgent');
 
   const reply = ticket.replies[ticket.replies.length - 1];
-  res.status(201).json({ data: { reply, assignedTo: ticket.assignedTo } });
+  res.status(201).json({ data: { reply, assignedTo: ticket.assignedTo, status: ticket.status } });
 
   void sendAgentReplyEmail(ticket.authorEmail, ticket.authorName, String(ticket._id), ticket.title, body.trim())
     .catch((err: unknown) => console.error('[agentReply] reply email failed:', err));

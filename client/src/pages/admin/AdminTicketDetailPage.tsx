@@ -1306,6 +1306,7 @@ export default function AdminTicketDetailPage() {
         ...prev,
         replies: [...prev.replies, replyData.reply],
         assignedTo: replyData.assignedTo ?? prev.assignedTo,
+        status: replyData.status ?? prev.status,
       } : prev);
       setReplyBody('');
       toast('Reply sent', 'success');
@@ -1393,6 +1394,7 @@ export default function AdminTicketDetailPage() {
         ...prev,
         replies: [...prev.replies, replyData.reply],
         assignedTo: replyData.assignedTo ?? prev.assignedTo,
+        status: replyData.status ?? prev.status,
       } : prev);
       setReplyBody('');
       setSuggestResult(null);

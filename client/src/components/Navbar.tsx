@@ -122,8 +122,8 @@ export default function Navbar({ isDark, onThemeToggle }: NavbarProps) {
               to="/support/lookup"
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
-                `rounded px-3 py-2.5 text-sm font-medium transition ${
-                  isActive ? 'bg-zinc-900 th-text' : 'text-zinc-400 hover:text-zinc-100'
+                `rounded border px-3 py-2.5 text-center text-sm font-semibold transition ${
+                  isActive ? 'border-[var(--th-border)] th-text bg-[var(--th-accent-dim)]' : 'border-zinc-700 text-zinc-300 hover:border-zinc-600 hover:text-zinc-100'
                 }`
               }
             >
@@ -150,6 +150,14 @@ export default function Navbar({ isDark, onThemeToggle }: NavbarProps) {
             >
               {isDark ? '☀ Light mode' : '🌙 Dark mode'}
             </button>
+            {/* Admin link mobile */}
+            <NavLink
+              to="/admin/login"
+              onClick={() => setMobileOpen(false)}
+              className="mt-1 rounded px-3 py-2 text-center text-xs font-medium text-zinc-600 transition hover:text-zinc-400"
+            >
+              {t.nav.admin}
+            </NavLink>
           </nav>
         </div>
       )}

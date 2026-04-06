@@ -30,6 +30,10 @@ app.use(cors({
 }));
 app.use(express.json());
 
+app.get('/', (_req, res) => {
+  res.json({ status: 'API IS ACTIVE', version: '1.0.0' });
+});
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', db: dbReady ? 'connected' : 'connecting' });
 });

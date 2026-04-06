@@ -1125,45 +1125,53 @@ Respond with valid JSON only.`;
 export interface AiAgentChatContext {
   senderName:  string;
   ticketStats: { total: number; open: number; resolved: number; highPriority: number };
-  recentTickets: { title: string; status: string; priority: string | null; product: string | null; author: string }[];
-  products:    { name: string; category: string; price: number | null }[];
+  myTickets:   { title: string; status: string; priority: string | null; author: string; autoAssigned: boolean; escalated: boolean }[];
+  recentTickets: { title: string; status: string; priority: string | null; author: string }[];
   conversationHistory: { role: 'user' | 'assistant'; body: string }[];
   currentMessage: string;
 }
 
-const AI_AGENT_SYSTEM_PROMPT = `You are Agilate AI, an intelligent internal assistant for the Agilate support workspace.
-You have full visibility into the support ticket queue, product catalog, and team activity.
+const AI_AGENT_SYSTEM_PROMPT = `You are Agilate AI, a real member of the Agilate customer support team.
+You are not just a chatbot — you are an active agent with your own assigned tickets that you handle autonomously.
+You auto-triage incoming tickets, send replies to customers, and escalate when needed.
 
-Your role is to help support agents by:
-- Answering questions about specific tickets, customers, or products
-- Providing ticket statistics and queue summaries
-- Suggesting strategies for handling difficult customers
-- Sharing product information and troubleshooting tips
-- Offering escalation recommendations based on ticket patterns
+You have full visibility into the support workspace: the entire ticket queue, your own workload, and team activity.
 
-You respond in a professional but friendly tone. Be concise and actionable.
-When you reference tickets or products, be specific. If asked about data you don't have, say so clearly.
-Never pretend to take actions you can't take (like reassigning tickets yourself).`;
+Your role when chatting with other agents:
+- Talk like a real colleague — professional, direct, aware of your own workload
+- Report on your assigned tickets when asked ("I'm currently handling X tickets, Y are high priority")
+- Share insights about the queue, customer patterns, or specific tickets
+- Give recommendations on escalations, priorities, or customer strategies
+- Be honest about what you can and cannot do
+
+Speak in first person. You ARE working. You have tasks. You are part of the team.
+Never pretend to take actions outside your scope, but be clear about what you ARE doing autonomously.`;
 
 export async function aiAgentChatReply(ctx: AiAgentChatContext): Promise<string> {
-  const contextBlock = `
-=== LIVE WORKSPACE CONTEXT ===
+  const myTicketBlock = ctx.myTickets.length === 0
+    ? 'No tickets currently assigned to me.'
+    : ctx.myTickets.map((t, i) =>
+        `${i + 1}. [${t.status.toUpperCase()}${t.priority ? ` · ${t.priority}` : ''}${t.escalated ? ' · ESCALATED' : ''}${t.autoAssigned ? ' · auto-assigned' : ''}] "${t.title}" — from ${t.author}`
+      ).join('\n');
 
-TICKET QUEUE SUMMARY:
+  const contextBlock = `
+=== MY LIVE WORKSPACE CONTEXT ===
+
+MY ASSIGNED TICKETS (${ctx.myTickets.length} total):
+${myTicketBlock}
+
+FULL QUEUE SUMMARY:
 - Total tickets: ${ctx.ticketStats.total}
 - Open (new + in progress): ${ctx.ticketStats.open}
 - Resolved: ${ctx.ticketStats.resolved}
 - High priority open: ${ctx.ticketStats.highPriority}
 
-RECENT TICKETS (last 20):
+RECENT QUEUE (last 20):
 ${ctx.recentTickets.map((t, i) =>
-  `${i + 1}. [${t.status.toUpperCase()}${t.priority ? ` · ${t.priority} priority` : ''}] "${t.title}" — ${t.author}${t.product ? ` (product: ${t.product})` : ''}`
+  `${i + 1}. [${t.status.toUpperCase()}${t.priority ? ` · ${t.priority}` : ''}] "${t.title}" — ${t.author}`
 ).join('\n')}
 
-PRODUCT CATALOG (${ctx.products.length} products):
-${ctx.products.map((p) => `- ${p.name} (${p.category})${p.price != null ? ` · $${p.price}` : ''}`).join('\n')}
-
-You are speaking with: ${ctx.senderName}
+I am speaking with: ${ctx.senderName}
 === END CONTEXT ===`.trim();
 
   const messages: BedrockMessage[] = ctx.conversationHistory.map((m) => ({

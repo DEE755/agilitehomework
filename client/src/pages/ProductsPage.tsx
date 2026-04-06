@@ -222,7 +222,7 @@ export default function ProductsPage() {
   const [searchParams] = useSearchParams();
   const { products: allProducts, loading, error, reload } = useProducts();
   const products = allProducts.filter(
-    (p) => p.isActive !== false && !p.name.toLowerCase().includes('produ'),
+    (p) => p.isActive !== false && !p.name.toLowerCase().includes('produ') && !!p.imageUrl,
   );
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);

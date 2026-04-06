@@ -365,7 +365,7 @@ export default function TicketLookupPage() {
             </Link>
             <button
               onClick={() => { setTicket(null); setExpanded(true); setTicketId(''); }}
-              className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-zinc-400 transition hover:text-zinc-200"
+              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100"
             >
               {tl.lookUpDifferent}
             </button>
