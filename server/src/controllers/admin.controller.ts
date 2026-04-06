@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { isValidObjectId } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { Ticket } from '../models/Ticket';
-import { User, AI_AGENT_EMAIL } from '../models/User';
+import { User, AI_AGENT_EMAIL, AI_AGENT_AVATAR_URL } from '../models/User';
 import { Product } from '../models/Product';
 import { InsightsSnapshot } from '../models/InsightsSnapshot';
 import { getOrCreateSettings } from '../models/Setting';
@@ -783,5 +783,31 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
   if (avatarKey !== undefined) user.avatarKey = avatarKey ?? undefined;
   await user.save();
   const avatarUrl = user.avatarKey ? await getObjectUrl(user.avatarKey) : undefined;
+  res.json({ data: { avatarUrl } });
+}
+
+// POST /api/admin/settings/ai-avatar/presign  (admin only)
+export async function presignAiAvatarUpload(req: Request, res: Response): Promise<void> {
+  const { contentType } = req.body as { contentType?: string };
+  if (!contentType) { res.status(400).json({ error: '"contentType" is required' }); return; }
+  const aiAgent = await User.findOne({ email: AI_AGENT_EMAIL }).lean();
+  if (!aiAgent) { res.status(404).json({ error: 'AI agent not found' }); return; }
+  try {
+    const data = await createAvatarUpload(String(aiAgent._id), contentType);
+    res.json({ data });
+  } catch (e) {
+    res.status(400).json({ error: e instanceof Error ? e.message : 'Failed to presign' });
+  }
+}
+
+// PATCH /api/admin/settings/ai-avatar  (admin only)
+export async function updateAiAgentAvatar(req: Request, res: Response): Promise<void> {
+  const { avatarKey } = req.body as { avatarKey?: string | null };
+  const aiAgent = await User.findOne({ email: AI_AGENT_EMAIL });
+  if (!aiAgent) { res.status(404).json({ error: 'AI agent not found' }); return; }
+  // null = reset to DiceBear default
+  aiAgent.avatarKey = avatarKey ?? AI_AGENT_AVATAR_URL;
+  await aiAgent.save();
+  const avatarUrl = await getObjectUrl(aiAgent.avatarKey ?? '') ?? aiAgent.avatarKey;
   res.json({ data: { avatarUrl } });
 }

@@ -16,7 +16,7 @@ import { errorHandler } from './middlewares/errorHandler';
 
 logfire.configure({
   token: process.env.LOGFIRE_TOKEN,
-  serviceName: 'agilite',
+  serviceName: 'agilate',
 });
 
 const app = express();

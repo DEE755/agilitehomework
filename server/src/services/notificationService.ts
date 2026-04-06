@@ -6,7 +6,7 @@ async function sendNotificationEmail(toEmail: string, subject: string, text: str
   const BASE_URL = (process.env.MAILGUN_BASE_URL ?? 'https://api.mailgun.net/v3').replace(/\/$/, '');
   const DOMAIN   = process.env.MAILGUN_DOMAIN ?? '';
   const API_KEY  = process.env.MAILGUN_API_KEY ?? '';
-  const FROM     = process.env.MAILGUN_FROM_EMAIL ?? `Agilite Support <no-reply@${DOMAIN}>`;
+  const FROM     = process.env.MAILGUN_FROM_EMAIL ?? `Agilate Support <no-reply@${DOMAIN}>`;
 
   if (!API_KEY || !DOMAIN) {
     console.warn('[notificationService] Mailgun not configured — skipping email');
@@ -39,8 +39,8 @@ export async function notifyAssigned(
   if (agent && !agent.isAiAgent) {
     void sendNotificationEmail(
       agent.email,
-      '[Agilite] New ticket assigned to you',
-      [`Hi ${agent.name},`, '', message, '', 'Log in to the Agilite Support Workspace to respond.', '', '— Agilite'].join('\n'),
+      '[Agilate] New ticket assigned to you',
+      [`Hi ${agent.name},`, '', message, '', 'Log in to the Agilate Support Workspace to respond.', '', '— Agilate'].join('\n'),
     ).catch((err: unknown) => console.error('[notificationService] Email failed:', err));
   }
 }
@@ -58,7 +58,7 @@ export async function notifyAiEscalated(
   if (agent && !agent.isAiAgent) {
     void sendNotificationEmail(
       agent.email,
-      '[Agilite] AI Agent escalated a ticket to you',
+      '[Agilate] AI Agent escalated a ticket to you',
       [
         `Hi ${agent.name},`,
         '',
@@ -66,7 +66,7 @@ export async function notifyAiEscalated(
         '',
         'The ticket has been reassigned to you. Please review the conversation and take over.',
         '',
-        '— Agilite Support System',
+        '— Agilate Support System',
       ].join('\n'),
     ).catch((err: unknown) => console.error('[notificationService] Email failed:', err));
   }
@@ -85,8 +85,8 @@ export async function notifyCustomerReplied(
   if (agent && !agent.isAiAgent) {
     void sendNotificationEmail(
       agent.email,
-      '[Agilite] Customer replied on your ticket',
-      [`Hi ${agent.name},`, '', message, '', 'Log in to the Agilite Support Workspace to respond.', '', '— Agilite'].join('\n'),
+      '[Agilate] Customer replied on your ticket',
+      [`Hi ${agent.name},`, '', message, '', 'Log in to the Agilate Support Workspace to respond.', '', '— Agilate'].join('\n'),
     ).catch((err: unknown) => console.error('[notificationService] Email failed:', err));
   }
 }

@@ -234,6 +234,12 @@ export const adminApi = {
     update(patch: Partial<AppSettings>): Promise<{ data: AppSettings }> {
       return req('/settings', { method: 'PATCH', body: JSON.stringify(patch) });
     },
+    presignAiAvatar(contentType: string): Promise<{ data: { uploadUrl: string; key: string; expiresIn: number } }> {
+      return req('/settings/ai-avatar/presign', { method: 'POST', body: JSON.stringify({ contentType }) });
+    },
+    updateAiAvatar(avatarKey: string | null): Promise<{ data: { avatarUrl: string | null } }> {
+      return req('/settings/ai-avatar', { method: 'PATCH', body: JSON.stringify({ avatarKey }) });
+    },
   },
 
   notifications: {

@@ -1,5 +1,5 @@
 {
-  "name": "projectagilite",
+  "name": "projectagilate",
   "private": true,
   "scripts": {
     "dev": "concurrently -n server,client -c yellow,cyan \"npm --prefix server run dev\" \"npm --prefix client run dev\"",

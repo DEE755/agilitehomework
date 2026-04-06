@@ -275,6 +275,8 @@ async function getAttachmentReadUrl(key: string): Promise<string> {
  * Returns undefined if storage is not configured.
  */
 export async function getObjectUrl(key: string): Promise<string | undefined> {
+  // Direct URLs stored as avatarKey (e.g. AI agent DiceBear avatar) — return as-is
+  if (key.startsWith('http://') || key.startsWith('https://')) return key;
   try {
     const config = getStorageConfig();
     if (config.publicBaseUrl) {

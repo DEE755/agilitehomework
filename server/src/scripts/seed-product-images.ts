@@ -98,7 +98,7 @@ function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-const WIKI_UA = 'ProjectAgilite/1.0 (https://github.com/example/projectagilite; image-seeder; contact: support@example.com)';
+const WIKI_UA = 'ProjectAgilate/1.0 (https://github.com/example/projectagilate; image-seeder; contact: support@example.com)';
 
 /**
  * Use the MediaWiki API to resolve a 1024px thumbnail URL for a Commons file.

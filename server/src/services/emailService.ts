@@ -3,7 +3,7 @@ import type { StoreInsightsResult } from './aiService';
 const BASE_URL = (process.env.MAILGUN_BASE_URL ?? 'https://api.mailgun.net/v3').replace(/\/$/, '');
 const DOMAIN   = process.env.MAILGUN_DOMAIN ?? '';
 const API_KEY  = process.env.MAILGUN_API_KEY ?? '';
-const FROM     = process.env.MAILGUN_FROM_EMAIL ?? `Agilite Support <no-reply@${DOMAIN}>`;
+const FROM     = process.env.MAILGUN_FROM_EMAIL ?? `Agilate Support <no-reply@${DOMAIN}>`;
 const APP_URL  = process.env.APP_URL ?? 'http://localhost:3000';
 
 class MailgunError extends Error {}
@@ -48,7 +48,7 @@ export async function sendTicketConfirmationEmail(
     '',
     "We'll be in touch soon.",
     '',
-    '— Agilite Support',
+    '— Agilate Support',
   ].join('\n');
 
   await sendMailgunMessage(toEmail, subject, text);
@@ -78,7 +78,7 @@ export async function sendAgentReplyEmail(
     '',
     `Ticket ID: ${ticketId}`,
     '',
-    '— Agilite Support',
+    '— Agilate Support',
   ].join('\n');
 
   await sendMailgunMessage(toEmail, subject, text);
@@ -139,7 +139,7 @@ export async function sendInsightsReportEmail(toEmail: string, toName: string, i
     ...insights.opportunities.map((o) => `✦ ${o.opportunity}\n  Impact: ${o.potentialImpact}`),
     '',
     '─────────────────────────────────────────',
-    'Powered by Agilite AI · Support Workspace',
+    'Powered by Agilate AI · Support Workspace',
   ];
 
   await sendMailgunMessage(toEmail, `Store AI Insights Report — ${generatedAt}`, lines.join('\n'));

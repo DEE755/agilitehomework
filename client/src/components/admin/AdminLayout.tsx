@@ -473,17 +473,28 @@ function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate, adminTheme, onT
 // ── Layout ────────────────────────────────────────────────────────────────────
 
 export default function AdminLayout() {
-  const [settingsOpen,   setSettingsOpen]   = useState(false);
-  const [insightsOpen,   setInsightsOpen]   = useState(false);
-  const [messagesOpen,   setMessagesOpen]   = useState(false);
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  const [profileOpen,    setProfileOpen]    = useState(false);
-  const [mobileNavOpen,  setMobileNavOpen]  = useState(false);
+  const [settingsOpen,        setSettingsOpen]        = useState(false);
+  const [settingsSection,     setSettingsSection]      = useState<'ai' | 'themes' | undefined>(undefined);
+  const [insightsOpen,        setInsightsOpen]         = useState(false);
+  const [messagesOpen,        setMessagesOpen]         = useState(false);
+  const [unreadMessages,      setUnreadMessages]       = useState(0);
+  const [profileOpen,         setProfileOpen]          = useState(false);
+  const [mobileNavOpen,       setMobileNavOpen]        = useState(false);
   const navigate = useNavigate();
   const [agent, setAgent] = useState(getStoredAgent);
   const [adminTheme, setAdminTheme] = useState<'dark' | 'light'>(
     () => (localStorage.getItem(ADMIN_THEME_KEY) as 'dark' | 'light') ?? 'dark'
   );
+
+  useEffect(() => {
+    function onOpenSettings(e: Event) {
+      const { section } = (e as CustomEvent<{ section?: 'ai' | 'themes' }>).detail;
+      setSettingsSection(section);
+      setSettingsOpen(true);
+    }
+    window.addEventListener('open-store-settings', onOpenSettings);
+    return () => window.removeEventListener('open-store-settings', onOpenSettings);
+  }, []);
 
   function handleThemeChange(t: 'dark' | 'light') {
     setAdminTheme(t);
@@ -538,13 +549,9 @@ export default function AdminLayout() {
               {agent?.role === 'admin' && (
                 <button
                   onClick={() => setSettingsOpen(true)}
-                  className="flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500 transition hover:text-zinc-200"
+                  className="rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500 transition hover:text-zinc-200"
                 >
-                  <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3 shrink-0">
-                    <path d="M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" strokeWidth="1.3"/>
-                    <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                  </svg>
-                  Settings
+                  Store Settings
                 </button>
               )}
               {agent?.role === 'admin' && (
@@ -609,7 +616,9 @@ export default function AdminLayout() {
               <NotificationBell inCluster />
               <button
                 onClick={() => setProfileOpen(true)}
-                className="flex items-center gap-2 px-2 py-1 transition hover:bg-zinc-800/60"
+                className="flex items-center px-2 py-1 transition hover:bg-zinc-800/60"
+                title={agent?.name ?? 'Profile'}
+                aria-label="Open profile"
               >
                 {agent?.avatarUrl ? (
                   <img src={agent.avatarUrl} alt={agent.name} className="h-6 w-6 rounded-full object-cover" />
@@ -618,7 +627,6 @@ export default function AdminLayout() {
                     {initials}
                   </span>
                 )}
-                <span className="hidden text-[10px] text-zinc-500 sm:block">{agent?.name ?? 'Agent'}</span>
               </button>
             </div>
           </div>
@@ -646,13 +654,9 @@ export default function AdminLayout() {
             {agent?.role === 'admin' && (
               <button
                 onClick={() => { setSettingsOpen(true); setMobileNavOpen(false); }}
-                className="flex items-center gap-2.5 rounded px-3 py-2.5 text-left text-sm font-medium text-zinc-400 transition hover:text-zinc-100"
+                className="rounded px-3 py-2.5 text-left text-sm font-medium text-zinc-400 transition hover:text-zinc-100"
               >
-                <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5 shrink-0 text-zinc-500">
-                  <path d="M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" strokeWidth="1.3"/>
-                  <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                </svg>
-                Settings
+                Store Settings
               </button>
             )}
             {agent?.role === 'admin' && (
@@ -685,7 +689,7 @@ export default function AdminLayout() {
         <Outlet />
       </main>
 
-      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsPanel open={settingsOpen} onClose={() => { setSettingsOpen(false); setSettingsSection(undefined); }} initialSection={settingsSection} />
       <InsightsPanel open={insightsOpen} onClose={() => setInsightsOpen(false)} />
       <MessagesPanel
         open={messagesOpen}

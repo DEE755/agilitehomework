@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import { Types } from 'mongoose';
 import { AgentMessage } from '../models/AgentMessage';
-import { User } from '../models/User';
+import { User, AI_AGENT_EMAIL } from '../models/User';
+import { Ticket } from '../models/Ticket';
+import { Product } from '../models/Product';
+import { aiAgentChatReply } from '../services/aiService';
 
 // ── GET /admin/messages/unread-count ─────────────────────────────────────────
 export async function getUnreadCount(req: Request, res: Response) {
@@ -143,7 +146,7 @@ export async function sendMessage(req: Request, res: Response) {
     })),
   });
 
-  return res.status(201).json({
+  res.status(201).json({
     data: {
       _id:         String(msg._id),
       fromId:      String(msg.fromId),
@@ -155,4 +158,65 @@ export async function sendMessage(req: Request, res: Response) {
       createdAt:   msg.createdAt,
     },
   });
+
+  // Fire-and-forget: AI agent auto-reply
+  if (recipient.isAiAgent) {
+    void (async () => {
+      try {
+        type TicketLean    = { title: string; status: string; aiPriority?: string | null; authorName?: string };
+        type ProductLean   = { name: string; category: string; price?: number | null };
+
+        const [allTickets, products, historyMsgs] = await Promise.all([
+          Ticket.find({}).select('title status aiPriority authorName').sort({ createdAt: -1 }).lean() as unknown as TicketLean[],
+          Product.find({ isActive: { $ne: false } }).select('name category price').lean() as unknown as ProductLean[],
+          AgentMessage.find({
+            $or: [
+              { fromId: myId,                       toId: new Types.ObjectId(toId) },
+              { fromId: new Types.ObjectId(toId),   toId: myId                     },
+            ],
+          }).sort({ createdAt: -1 }).limit(10).lean(),
+        ]);
+
+        const total       = allTickets.length;
+        const resolved    = allTickets.filter((t) => t.status === 'resolved').length;
+        const open        = total - resolved;
+        const highPriority = allTickets.filter(
+          (t) => t.status !== 'resolved' && t.aiPriority === 'high',
+        ).length;
+
+        const ctx = {
+          senderName:  req.agent!.name,
+          ticketStats: { total, open, resolved, highPriority },
+          recentTickets: allTickets.slice(0, 20).map((t) => ({
+            title:    t.title,
+            status:   t.status,
+            priority: t.aiPriority ?? null,
+            product:  null,
+            author:   t.authorName ?? 'Unknown',
+          })),
+          products: products.map((p) => ({
+            name:     p.name,
+            category: p.category,
+            price:    p.price ?? null,
+          })),
+          conversationHistory: historyMsgs.slice().reverse().map((m) => ({
+            role: String(m.fromId) === String(myId) ? 'user' as const : 'assistant' as const,
+            body: m.body,
+          })),
+          currentMessage: body.trim(),
+        };
+
+        const reply = await aiAgentChatReply(ctx);
+        await AgentMessage.create({
+          fromId:      new Types.ObjectId(toId),
+          toId:        myId,
+          body:        reply,
+          ticketRefs:  [],
+          productRefs: [],
+        });
+      } catch {
+        // best-effort — ignore failures
+      }
+    })();
+  }
 }

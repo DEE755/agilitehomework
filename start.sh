@@ -8,7 +8,7 @@ CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
 RESET='\033[0m'
 
-echo -e "${CYAN}Starting Agilite...${RESET}"
+echo -e "${CYAN}Starting Agilate...${RESET}"
 
 # Start backend
 echo -e "${YELLOW}[server]${RESET} Starting on http://localhost:3000"

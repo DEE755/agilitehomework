@@ -1,5 +1,5 @@
 {
-  "name": "projectagilite-server",
+  "name": "projectagilate-server",
   "version": "1.0.0",
   "description": "Customer support ticketing API",
   "main": "dist/index.js",

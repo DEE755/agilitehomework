@@ -6,6 +6,7 @@ import { THEMES, applyTheme as applySeasonalTheme, getTheme } from '../../themes
 interface Props {
   open: boolean;
   onClose: () => void;
+  initialSection?: 'ai' | 'themes';
 }
 
 function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -64,7 +65,7 @@ function SectionHeader({
 const JEWISH_THEMES     = THEMES.filter((t) => t.group === 'jewish');
 const COMMERCIAL_THEMES = THEMES.filter((t) => t.group === 'commercial');
 
-export default function SettingsPanel({ open, onClose }: Props) {
+export default function SettingsPanel({ open, onClose, initialSection }: Props) {
   const [settings, setSettings]           = useState<AppSettings | null>(null);
   const [saving, setSaving]               = useState(false);
   const [error, setError]                 = useState<string | null>(null);
@@ -72,17 +73,33 @@ export default function SettingsPanel({ open, onClose }: Props) {
   const [themesExpanded, setThemesExpanded] = useState(false);
   // Theme the user clicked but hasn't confirmed yet
   const [pendingTheme, setPendingTheme]   = useState<string | null>(null);
+  // AI avatar upload
+  const [aiAvatar, setAiAvatar]           = useState<string | null>(null);
+  const [aiAvatarUploading, setAiAvatarUploading] = useState(false);
+  const aiAvatarRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      // Fold everything when panel closes
+      setAiExpanded(false);
+      setThemesExpanded(false);
+      return;
+    }
+    setAiExpanded(initialSection === 'ai');
+    setThemesExpanded(initialSection === 'themes');
     adminApi.settings.get()
       .then((res) => {
         setSettings(res.data);
         if (res.data.activeTheme) applySeasonalTheme(res.data.activeTheme);
       })
       .catch((e: Error) => setError(e.message));
-  }, [open]);
+    // Load AI agent's current avatar
+    adminApi.agents().then((res) => {
+      const ai = res.data.find((a) => a.isAiAgent);
+      if (ai) setAiAvatar(ai.avatarUrl ?? null);
+    }).catch(() => null);
+  }, [open, initialSection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear pending selection when section collapses
   useEffect(() => {
@@ -110,6 +127,34 @@ export default function SettingsPanel({ open, onClose }: Props) {
       setError((e as Error).message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function uploadAiAvatar(file: File) {
+    setAiAvatarUploading(true);
+    setError(null);
+    try {
+      const { data: presign } = await adminApi.settings.presignAiAvatar(file.type);
+      await fetch(presign.uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+      const { data } = await adminApi.settings.updateAiAvatar(presign.key);
+      setAiAvatar(data.avatarUrl);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to upload avatar');
+    } finally {
+      setAiAvatarUploading(false);
+    }
+  }
+
+  async function resetAiAvatar() {
+    setAiAvatarUploading(true);
+    setError(null);
+    try {
+      const { data } = await adminApi.settings.updateAiAvatar(null);
+      setAiAvatar(data.avatarUrl);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to reset avatar');
+    } finally {
+      setAiAvatarUploading(false);
     }
   }
 
@@ -195,7 +240,8 @@ export default function SettingsPanel({ open, onClose }: Props) {
             />
 
             {aiExpanded && (
-              <div className="mt-3">
+              <div className="mt-3 space-y-3">
+                {/* Auto-reply */}
                 <div className="flex items-start justify-between gap-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3.5">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-zinc-200">Auto-reply</p>
@@ -213,6 +259,45 @@ export default function SettingsPanel({ open, onClose }: Props) {
                     checked={settings?.autoReplyEnabled ?? false}
                     onChange={(v) => void toggle('autoReplyEnabled', v)}
                     disabled={saving || settings === null}
+                  />
+                </div>
+
+                {/* AI Agent avatar */}
+                <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3.5">
+                  <p className="mb-3 text-xs font-semibold text-zinc-200">AI Agent Picture</p>
+                  <div className="flex items-center gap-3">
+                    {aiAvatar ? (
+                      <img src={aiAvatar} alt="AI Agent" className="h-12 w-12 rounded-full object-cover shrink-0 border border-zinc-700" />
+                    ) : (
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-[10px] font-bold text-zinc-400">AI</div>
+                    )}
+                    <div className="flex flex-col gap-1.5 min-w-0">
+                      <button
+                        onClick={() => aiAvatarRef.current?.click()}
+                        disabled={aiAvatarUploading}
+                        className="rounded-lg border border-zinc-700 px-3 py-1.5 text-[11px] font-semibold text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100 disabled:opacity-50"
+                      >
+                        {aiAvatarUploading ? 'Uploading…' : 'Upload photo'}
+                      </button>
+                      <button
+                        onClick={() => void resetAiAvatar()}
+                        disabled={aiAvatarUploading}
+                        className="text-[11px] text-zinc-600 transition hover:text-zinc-400 disabled:opacity-50"
+                      >
+                        Reset to default
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    ref={aiAvatarRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void uploadAiAvatar(file);
+                      e.target.value = '';
+                    }}
                   />
                 </div>
               </div>

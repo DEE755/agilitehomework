@@ -192,7 +192,7 @@ export async function triageTicket(input: {
 // Suggest Reply
 // ---------------------------------------------------------------------------
 
-const REPLY_SYSTEM_PROMPT = `You are an expert customer support AI for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
+const REPLY_SYSTEM_PROMPT = `You are an expert customer support AI for Agilate, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
 
 Analyse the support ticket and return ONLY a JSON object with these exact fields:
 {
@@ -276,7 +276,7 @@ export async function suggestReply(input: {
 // Customer self-service ask
 // ---------------------------------------------------------------------------
 
-const CUSTOMER_ASK_PROMPT = `You are a helpful support assistant for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
+const CUSTOMER_ASK_PROMPT = `You are a helpful support assistant for Agilate, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
 A customer is asking a quick question before opening a support ticket. Help them concisely if you can.
 
 Return a JSON object with exactly these fields:
@@ -328,7 +328,7 @@ export async function customerAsk(question: string, product?: { name: string; ca
 // Customer Profile Analysis
 // ---------------------------------------------------------------------------
 
-const CUSTOMER_PROFILE_PROMPT = `You are an expert customer success and sales analyst for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
+const CUSTOMER_PROFILE_PROMPT = `You are an expert customer success and sales analyst for Agilate, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
 
 Analyse the support ticket including subject, message, and any agent/customer conversation history to deeply profile the customer.
 
@@ -428,7 +428,7 @@ export async function analyzeCustomerProfile(input: {
 // Remarketing Pitch Generator
 // ---------------------------------------------------------------------------
 
-const REMARKET_SYSTEM_PROMPT = `You are an expert product recommender for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
+const REMARKET_SYSTEM_PROMPT = `You are an expert product recommender for Agilate, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
 Your goal is to suggest ONE product to cross-sell or upsell to a customer based on their support ticket context and customer profile, and generate a warm, non-pushy pitch.
 
 You will receive: the customer's issue, their profile archetype, and a catalog of available products.
@@ -588,7 +588,7 @@ function buildCoachSystemPrompt(ctx: CoachContext): string {
       ].filter(Boolean).join(' and ')} ${!hasAiInsights && !hasCustomerProfile ? 'have' : 'has'} not been run yet. Proactively mention this when relevant and tell the agent where to find the button.`
     : '';
 
-  return `You are an expert customer success coach and commercial strategist coaching a support agent in real time for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
+  return `You are an expert customer success coach and commercial strategist coaching a support agent in real time for Agilate, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
 
 Your role: give sharp, actionable guidance. Think like a senior sales manager briefing a rep before a difficult call — direct, strategic, no fluff. Keep responses focused (150–250 words unless the agent asks for more detail).
 
@@ -852,7 +852,7 @@ export interface StoreInsightsResult {
   };
 }
 
-const INSIGHTS_SYSTEM_PROMPT = `You are a senior marketing strategist and customer success expert analysing support ticket data for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
+const INSIGHTS_SYSTEM_PROMPT = `You are a senior marketing strategist and customer success expert analysing support ticket data for Agilate, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
 
 Your role: turn raw support data into sharp, boardroom-ready insights. Think like a CMO reviewing the support queue — what does this data tell us about the health of the business, customer satisfaction, revenue risk, growth opportunities, AND how well the support operation itself is running?
 
@@ -1116,6 +1116,65 @@ Respond with valid JSON only.`;
     strengths:            Array.isArray(p.strengths) ? (p.strengths as string[]) : [],
     areasForImprovement:  Array.isArray(p.areasForImprovement) ? (p.areasForImprovement as string[]) : [],
   };
+}
+
+// ---------------------------------------------------------------------------
+// AI Agent chat reply — answers messages sent to the AI agent in the internal chat
+// ---------------------------------------------------------------------------
+
+export interface AiAgentChatContext {
+  senderName:  string;
+  ticketStats: { total: number; open: number; resolved: number; highPriority: number };
+  recentTickets: { title: string; status: string; priority: string | null; product: string | null; author: string }[];
+  products:    { name: string; category: string; price: number | null }[];
+  conversationHistory: { role: 'user' | 'assistant'; body: string }[];
+  currentMessage: string;
+}
+
+const AI_AGENT_SYSTEM_PROMPT = `You are Agilate AI, an intelligent internal assistant for the Agilate support workspace.
+You have full visibility into the support ticket queue, product catalog, and team activity.
+
+Your role is to help support agents by:
+- Answering questions about specific tickets, customers, or products
+- Providing ticket statistics and queue summaries
+- Suggesting strategies for handling difficult customers
+- Sharing product information and troubleshooting tips
+- Offering escalation recommendations based on ticket patterns
+
+You respond in a professional but friendly tone. Be concise and actionable.
+When you reference tickets or products, be specific. If asked about data you don't have, say so clearly.
+Never pretend to take actions you can't take (like reassigning tickets yourself).`;
+
+export async function aiAgentChatReply(ctx: AiAgentChatContext): Promise<string> {
+  const contextBlock = `
+=== LIVE WORKSPACE CONTEXT ===
+
+TICKET QUEUE SUMMARY:
+- Total tickets: ${ctx.ticketStats.total}
+- Open (new + in progress): ${ctx.ticketStats.open}
+- Resolved: ${ctx.ticketStats.resolved}
+- High priority open: ${ctx.ticketStats.highPriority}
+
+RECENT TICKETS (last 20):
+${ctx.recentTickets.map((t, i) =>
+  `${i + 1}. [${t.status.toUpperCase()}${t.priority ? ` · ${t.priority} priority` : ''}] "${t.title}" — ${t.author}${t.product ? ` (product: ${t.product})` : ''}`
+).join('\n')}
+
+PRODUCT CATALOG (${ctx.products.length} products):
+${ctx.products.map((p) => `- ${p.name} (${p.category})${p.price != null ? ` · $${p.price}` : ''}`).join('\n')}
+
+You are speaking with: ${ctx.senderName}
+=== END CONTEXT ===`.trim();
+
+  const messages: BedrockMessage[] = ctx.conversationHistory.map((m) => ({
+    role:    m.role === 'user' ? 'user' : 'assistant',
+    content: [{ text: m.body }],
+  }));
+  messages.push({ role: 'user', content: [{ text: ctx.currentMessage }] });
+
+  return logfire.span('ai_agent_chat_reply', async () =>
+    chatRaw(`${AI_AGENT_SYSTEM_PROMPT}\n\n${contextBlock}`, messages, 30_000),
+  );
 }
 
 // ---------------------------------------------------------------------------

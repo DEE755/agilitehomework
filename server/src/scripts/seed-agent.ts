@@ -17,7 +17,7 @@ for (const p of envCandidates) {
   if (fs.existsSync(p)) { dotenv.config({ path: p }); break; }
 }
 
-const EMAIL    = process.env.SEED_EMAIL    ?? 'admin@agilite.com';
+const EMAIL    = process.env.SEED_EMAIL    ?? 'admin@agilate.com';
 const PASSWORD = process.env.SEED_PASSWORD ?? 'Admin1234!';
 const NAME     = process.env.SEED_NAME     ?? 'Admin';
 

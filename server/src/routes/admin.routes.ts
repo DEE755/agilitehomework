@@ -31,6 +31,8 @@ import {
   compareInsights,
   aiRateAgent,
   updateAgentRating,
+  presignAiAvatarUpload,
+  updateAiAgentAvatar,
 } from '../controllers/admin.controller';
 import {
   getUnreadCount,
@@ -67,7 +69,9 @@ router.get('/ai-insights/history/:snapshotId', getInsightsSnapshot);
 router.post('/ai-insights/compare',           compareInsights);
 router.post('/agents/:agentId/ai-rate',       requireRole('admin'), aiRateAgent);
 router.patch('/agents/:agentId/rating',       requireRole('admin'), updateAgentRating);
-router.patch('/settings',          requireRole('admin'), updateSettings);
+router.patch('/settings',                               requireRole('admin'), updateSettings);
+router.post('/settings/ai-avatar/presign',              requireRole('admin'), presignAiAvatarUpload);
+router.patch('/settings/ai-avatar',                     requireRole('admin'), updateAiAgentAvatar);
 router.patch('/profile/password',                     changePassword);
 router.patch('/profile',                              updateProfile);
 router.post('/profile/avatar/presign',                presignAvatarUpload);

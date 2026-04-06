@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 const TOKEN_KEY = 'ag_admin_token';
 const AGENT_KEY = 'ag_admin_agent';
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
-const ADMIN_EMAIL = 'admin@agilite.com';
+const ADMIN_EMAIL = 'admin@agilate.com';
 const ADMIN_PASSWORD = 'Admin1234!';
 
 interface LoginResponse {
