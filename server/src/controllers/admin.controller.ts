@@ -495,7 +495,99 @@ interface InsightsCache {
   expiresAt: number;
 }
 let insightsCache: InsightsCache | null = null;
+let insightsGenerating = false;
 const INSIGHTS_CACHE_TTL_MS = 30 * 60 * 1000;
+
+async function runInsightsGeneration(force: boolean): Promise<void> {
+  if (insightsGenerating) return;
+  insightsGenerating = true;
+  try {
+    const tickets = await Ticket.find()
+      .select('status aiPriority aiSummary aiTags mktSentiment mktArchetype mktArchetypeLabel mktRefundIntent mktChurnRisk mktLifetimeValueSignal mktProfiledAt aiTriagedAt')
+      .populate('product', 'name category')
+      .lean();
+
+    const total      = tickets.length;
+    const resolved   = tickets.filter((t) => t.status === 'resolved').length;
+    const open       = total - resolved;
+    const unanalyzed = tickets.filter((t) => !t.aiTriagedAt).length;
+
+    function countBy<T>(arr: T[], key: keyof T): Record<string, number> {
+      return arr.reduce((acc, item) => {
+        const v = String(item[key] ?? 'unknown');
+        acc[v] = (acc[v] ?? 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+    }
+
+    const analyzed = tickets.filter((t) => t.aiTriagedAt);
+    const priorityBreakdown  = countBy(analyzed, 'aiPriority' as keyof typeof analyzed[0]);
+    const sentimentBreakdown = countBy(tickets.filter((t) => t.mktSentiment), 'mktSentiment' as keyof typeof tickets[0]);
+    const archetypeBreakdown = countBy(tickets.filter((t) => t.mktArchetypeLabel), 'mktArchetypeLabel' as keyof typeof tickets[0]);
+    const refundBreakdown    = countBy(tickets.filter((t) => t.mktRefundIntent), 'mktRefundIntent' as keyof typeof tickets[0]);
+    const churnBreakdown     = countBy(tickets.filter((t) => t.mktChurnRisk), 'mktChurnRisk' as keyof typeof tickets[0]);
+    const ltvBreakdown       = countBy(tickets.filter((t) => t.mktLifetimeValueSignal), 'mktLifetimeValueSignal' as keyof typeof tickets[0]);
+
+    const tagCount: Record<string, number> = {};
+    for (const t of analyzed) {
+      for (const tag of (t.aiTags ?? [])) { tagCount[tag] = (tagCount[tag] ?? 0) + 1; }
+    }
+    const topTags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([tag, count]) => ({ tag, count }));
+
+    const productCount: Record<string, number> = {};
+    for (const t of tickets) {
+      const prod = t.product as { name?: string } | null;
+      if (prod?.name) { productCount[prod.name] = (productCount[prod.name] ?? 0) + 1; }
+    }
+    const topProducts = Object.entries(productCount).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, count }));
+
+    const recentSummaries = analyzed
+      .filter((t) => t.aiSummary)
+      .sort((a, b) => new Date(b.aiTriagedAt as Date).getTime() - new Date(a.aiTriagedAt as Date).getTime())
+      .slice(0, 20)
+      .map((t) => t.aiSummary as string);
+
+    const aiAgentUser = await User.findOne({ isAiAgent: true }).select('_id').lean();
+    const aiAgentId   = aiAgentUser?._id;
+    const [humanAgentCount, aiAssignedCount, unassignedOpenCount, orphanedHighPriorityCount, noReplyOpenCount] = await Promise.all([
+      User.countDocuments({ isAiAgent: { $ne: true } }),
+      aiAgentId ? Ticket.countDocuments({ assignedTo: aiAgentId }) : Promise.resolve(0),
+      Ticket.countDocuments({ assignedTo: null, status: { $ne: 'resolved' } }),
+      Ticket.countDocuments({ assignedTo: null, aiPriority: 'high', status: { $ne: 'resolved' } }),
+      Ticket.countDocuments({ 'replies.0': { $exists: false }, status: { $ne: 'resolved' } }),
+    ]);
+
+    const insights = await generateStoreInsights({
+      totalTickets: total, openTickets: open, resolvedTickets: resolved,
+      priorityBreakdown, sentimentBreakdown, archetypeBreakdown,
+      refundIntentBreakdown: refundBreakdown, churnRiskBreakdown: churnBreakdown, ltvBreakdown,
+      topTags, topProducts, recentSummaries, unanalyzedCount: unanalyzed,
+      humanAgentCount, aiAssignedCount, unassignedOpenCount, orphanedHighPriorityCount, noReplyOpenCount,
+    });
+    const generatedAt = new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+    insightsCache = { data: insights, generatedAt, expiresAt: Date.now() + INSIGHTS_CACHE_TTL_MS };
+
+    void (async () => {
+      try {
+        await InsightsSnapshot.create({
+          data: insights,
+          metrics: { totalTickets: total, openTickets: open, resolvedTickets: resolved, humanAgentCount },
+          healthScore: insights.storeHealthScore,
+          generatedAt: new Date(),
+        });
+        const count = await InsightsSnapshot.countDocuments();
+        if (count > 100) {
+          const oldest = await InsightsSnapshot.find().sort({ generatedAt: 1 }).limit(count - 100).select('_id').lean();
+          await InsightsSnapshot.deleteMany({ _id: { $in: oldest.map((d) => d._id) } });
+        }
+      } catch { /* non-critical */ }
+    })();
+  } catch (e) {
+    console.error('[insights] generation failed:', e instanceof Error ? e.message : e);
+  } finally {
+    insightsGenerating = false;
+  }
+}
 
 // GET /api/admin/ai-insights
 export async function getAiInsights(req: Request, res: Response): Promise<void> {
@@ -506,120 +598,9 @@ export async function getAiInsights(req: Request, res: Response): Promise<void> 
     return;
   }
 
-  // Pull all tickets with AI + marketing data (lean, no body text)
-  const tickets = await Ticket.find()
-    .select('status aiPriority aiSummary aiTags mktSentiment mktArchetype mktArchetypeLabel mktRefundIntent mktChurnRisk mktLifetimeValueSignal mktProfiledAt aiTriagedAt')
-    .populate('product', 'name category')
-    .lean();
-
-  const total      = tickets.length;
-  const resolved   = tickets.filter((t) => t.status === 'resolved').length;
-  const open       = total - resolved;
-  const unanalyzed = tickets.filter((t) => !t.aiTriagedAt).length;
-
-  function countBy<T>(arr: T[], key: keyof T): Record<string, number> {
-    return arr.reduce((acc, item) => {
-      const v = String(item[key] ?? 'unknown');
-      acc[v] = (acc[v] ?? 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-  }
-
-  const analyzed = tickets.filter((t) => t.aiTriagedAt);
-
-  const priorityBreakdown  = countBy(analyzed, 'aiPriority' as keyof typeof analyzed[0]);
-  const sentimentBreakdown = countBy(tickets.filter((t) => t.mktSentiment), 'mktSentiment' as keyof typeof tickets[0]);
-  const archetypeBreakdown = countBy(tickets.filter((t) => t.mktArchetypeLabel), 'mktArchetypeLabel' as keyof typeof tickets[0]);
-  const refundBreakdown    = countBy(tickets.filter((t) => t.mktRefundIntent), 'mktRefundIntent' as keyof typeof tickets[0]);
-  const churnBreakdown     = countBy(tickets.filter((t) => t.mktChurnRisk), 'mktChurnRisk' as keyof typeof tickets[0]);
-  const ltvBreakdown       = countBy(tickets.filter((t) => t.mktLifetimeValueSignal), 'mktLifetimeValueSignal' as keyof typeof tickets[0]);
-
-  // Top tags
-  const tagCount: Record<string, number> = {};
-  for (const t of analyzed) {
-    for (const tag of (t.aiTags ?? [])) { tagCount[tag] = (tagCount[tag] ?? 0) + 1; }
-  }
-  const topTags = Object.entries(tagCount)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([tag, count]) => ({ tag, count }));
-
-  // Top products by ticket count
-  const productCount: Record<string, number> = {};
-  for (const t of tickets) {
-    const prod = t.product as { name?: string } | null;
-    if (prod?.name) { productCount[prod.name] = (productCount[prod.name] ?? 0) + 1; }
-  }
-  const topProducts = Object.entries(productCount)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([name, count]) => ({ name, count }));
-
-  // Recent summaries (last 20 analyzed)
-  const recentSummaries = analyzed
-    .filter((t) => t.aiSummary)
-    .sort((a, b) => new Date(b.aiTriagedAt as Date).getTime() - new Date(a.aiTriagedAt as Date).getTime())
-    .slice(0, 20)
-    .map((t) => t.aiSummary as string);
-
-  // Operational / vendor metrics
-  const aiAgentUser = await User.findOne({ isAiAgent: true }).select('_id').lean();
-  const aiAgentId   = aiAgentUser?._id;
-
-  const [humanAgentCount, aiAssignedCount, unassignedOpenCount, orphanedHighPriorityCount, noReplyOpenCount] = await Promise.all([
-    User.countDocuments({ isAiAgent: { $ne: true } }),
-    aiAgentId ? Ticket.countDocuments({ assignedTo: aiAgentId }) : Promise.resolve(0),
-    Ticket.countDocuments({ assignedTo: null, status: { $ne: 'resolved' } }),
-    Ticket.countDocuments({ assignedTo: null, aiPriority: 'high', status: { $ne: 'resolved' } }),
-    Ticket.countDocuments({ 'replies.0': { $exists: false }, status: { $ne: 'resolved' } }),
-  ]);
-
-  try {
-    const insights = await generateStoreInsights({
-      totalTickets: total,
-      openTickets: open,
-      resolvedTickets: resolved,
-      priorityBreakdown,
-      sentimentBreakdown,
-      archetypeBreakdown,
-      refundIntentBreakdown: refundBreakdown,
-      churnRiskBreakdown:    churnBreakdown,
-      ltvBreakdown,
-      topTags,
-      topProducts,
-      recentSummaries,
-      unanalyzedCount: unanalyzed,
-      humanAgentCount,
-      aiAssignedCount,
-      unassignedOpenCount,
-      orphanedHighPriorityCount,
-      noReplyOpenCount,
-    });
-    const generatedAt = new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
-    insightsCache = { data: insights, generatedAt, expiresAt: Date.now() + INSIGHTS_CACHE_TTL_MS };
-
-    // Persist snapshot to DB (fire-and-forget; cap at 100 entries)
-    void (async () => {
-      try {
-        await InsightsSnapshot.create({
-          data: insights,
-          metrics: { totalTickets: total, openTickets: open, resolvedTickets: resolved, humanAgentCount },
-          healthScore: insights.storeHealthScore,
-          generatedAt: new Date(),
-        });
-        // Prune oldest beyond 100
-        const count = await InsightsSnapshot.countDocuments();
-        if (count > 100) {
-          const oldest = await InsightsSnapshot.find().sort({ generatedAt: 1 }).limit(count - 100).select('_id').lean();
-          await InsightsSnapshot.deleteMany({ _id: { $in: oldest.map((d) => d._id) } });
-        }
-      } catch { /* non-critical */ }
-    })();
-
-    res.json({ data: insights, generatedAt, cached: false });
-  } catch (e) {
-    res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to generate insights' });
-  }
+  // Kick off background generation and return immediately
+  void runInsightsGeneration(force);
+  res.status(202).json({ status: 'generating' });
 }
 
 // POST /api/admin/ai-insights/email

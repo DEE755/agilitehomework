@@ -179,7 +179,7 @@ export const adminApi = {
     return req('/profile', { method: 'PATCH', body: JSON.stringify(data) });
   },
 
-  aiInsights(refresh = false): Promise<{ data: StoreInsightsResult; generatedAt: string; cached: boolean }> {
+  aiInsights(refresh = false): Promise<{ status?: 'generating'; data?: StoreInsightsResult; generatedAt?: string; cached?: boolean }> {
     return req(`/ai-insights${refresh ? '?refresh=true' : ''}`);
   },
 

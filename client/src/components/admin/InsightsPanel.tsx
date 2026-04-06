@@ -229,21 +229,34 @@ export default function InsightsPanel({ open, onClose }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   async function loadCurrent(refresh: boolean) {
     setLoading(true);
     setError(null);
+    if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
     try {
       const res = await adminApi.aiInsights(refresh);
+      if (res.status === 'generating' || !res.data) {
+        // Not ready yet — poll again in 5s
+        pollRef.current = setTimeout(() => { void loadCurrent(false); }, 5000);
+        return;
+      }
       setInsights(res.data);
-      setGeneratedAt(res.generatedAt);
-      setCached(res.cached && !refresh);
-      if (refresh) await loadHistory(); // refresh history list too
+      setGeneratedAt(res.generatedAt ?? null);
+      setCached((res.cached ?? false) && !refresh);
+      if (refresh) await loadHistory();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to generate insights');
     } finally {
-      setLoading(false);
+      if (!pollRef.current) setLoading(false);
     }
   }
+
+  // Clean up poll on unmount or panel close
+  useEffect(() => {
+    if (!open && pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; setLoading(false); }
+  }, [open]);
 
   const loadHistory = useCallback(async () => {
     setHistLoading(true);
