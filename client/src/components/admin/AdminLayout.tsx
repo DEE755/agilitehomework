@@ -15,6 +15,34 @@ const AGENT_KEY = 'ag_admin_agent';
 const inputCls =
   'w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-olive-500/60 focus:ring-1 focus:ring-olive-500/30';
 
+// ── Avatar crop helper (canvas, object-fit: cover math) ───────────────────────
+
+function cropImageToBlob(src: string, posX: number, posY: number, outputSize = 400): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = outputSize;
+      canvas.height = outputSize;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('No canvas context')); return; }
+      ctx.beginPath();
+      ctx.arc(outputSize / 2, outputSize / 2, outputSize / 2, 0, Math.PI * 2);
+      ctx.clip();
+      // object-fit: cover
+      const scale = Math.max(outputSize / img.naturalWidth, outputSize / img.naturalHeight);
+      const sw = img.naturalWidth * scale;
+      const sh = img.naturalHeight * scale;
+      const x = -(posX / 100) * (sw - outputSize);
+      const y = -(posY / 100) * (sh - outputSize);
+      ctx.drawImage(img, x, y, sw, sh);
+      canvas.toBlob((b) => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/jpeg', 0.92);
+    };
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
 // ── Forced password change modal (no current password required) ───────────────
 
 function ChangePasswordModal({ onDone }: { onDone: () => void }) {
@@ -102,6 +130,12 @@ function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate, adminTheme, onT
   // Avatar
   const [avatarPreview, setAvatarPreview] = useState<string | null>(agent?.avatarUrl ?? null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [confirmRemoveAvatar, setConfirmRemoveAvatar] = useState(false);
+  // Crop state — set when a new file is chosen, cleared after apply/cancel
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropSrc, setCropSrc]   = useState<string | null>(null);
+  const [cropPos, setCropPos]   = useState<{ x: number; y: number }>({ x: 50, y: 50 });
+  const cropDragRef = useRef<{ sx: number; sy: number; px: number; py: number } | null>(null);
 
   // Change password
   const [pwOpen,   setPwOpen]   = useState(false);
@@ -123,27 +157,33 @@ function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate, adminTheme, onT
     return () => document.removeEventListener('keydown', handler);
   }, [open, onClose]);
 
-  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Local preview
+    if (fileRef.current) fileRef.current.value = '';
     const reader = new FileReader();
-    reader.onload = (ev) => setAvatarPreview(ev.target?.result as string);
+    reader.onload = (ev) => {
+      setCropSrc(ev.target?.result as string);
+      setCropFile(file);
+      setCropPos({ x: 50, y: 50 });
+    };
     reader.readAsDataURL(file);
+  }
+
+  async function handleCropApply() {
+    if (!cropFile || !cropSrc) return;
+    const src = cropSrc;
+    const pos = cropPos;
+    setCropFile(null);
+    setCropSrc(null);
     setAvatarUploading(true);
     try {
-      // 1. Get presigned URL
-      const { data: presign } = await adminApi.presignAvatar(file.type);
-      // 2. Upload directly to R2
-      await fetch(presign.uploadUrl, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type },
-      });
-      // 3. Save key on server
+      const blob = await cropImageToBlob(src, pos.x, pos.y, 400);
+      setAvatarPreview(URL.createObjectURL(blob));
+      const { data: presign } = await adminApi.presignAvatar('image/jpeg');
+      await fetch(presign.uploadUrl, { method: 'PUT', body: blob, headers: { 'Content-Type': 'image/jpeg' } });
       const { data: profile } = await adminApi.updateProfile({ avatarKey: presign.key });
-      const url = profile.avatarUrl ?? URL.createObjectURL(file);
-      // 4. Persist in localStorage
+      const url = profile.avatarUrl ?? URL.createObjectURL(blob);
       const stored = getStoredAgent();
       if (stored) localStorage.setItem(AGENT_KEY, JSON.stringify({ ...stored, avatarUrl: url }));
       setAvatarPreview(url);
@@ -153,7 +193,45 @@ function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate, adminTheme, onT
       toast(err instanceof Error ? err.message : 'Upload failed', 'error');
     } finally {
       setAvatarUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  function handleCropCancel() {
+    setCropFile(null);
+    setCropSrc(null);
+  }
+
+  function onCropPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    cropDragRef.current = { sx: e.clientX, sy: e.clientY, px: cropPos.x, py: cropPos.y };
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+  }
+
+  function onCropPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.buttons === 0 || !cropDragRef.current) return;
+    const { sx, sy, px, py } = cropDragRef.current;
+    // Dragging right reveals left of image → X decreases; sensitivity: 1px = 0.4%
+    const newX = Math.max(0, Math.min(100, px - (e.clientX - sx) * 0.4));
+    const newY = Math.max(0, Math.min(100, py - (e.clientY - sy) * 0.4));
+    setCropPos({ x: newX, y: newY });
+  }
+
+  function onCropPointerUp() {
+    cropDragRef.current = null;
+  }
+
+  async function handleDeleteAvatar() {
+    setAvatarUploading(true);
+    try {
+      await adminApi.updateProfile({ avatarKey: null });
+      setAvatarPreview(null);
+      onAvatarUpdate('');
+      const stored = getStoredAgent();
+      if (stored) localStorage.setItem(AGENT_KEY, JSON.stringify({ ...stored, avatarUrl: null }));
+      toast('Profile photo removed', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to remove photo', 'error');
+    } finally {
+      setAvatarUploading(false);
     }
   }
 
@@ -202,6 +280,40 @@ function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate, adminTheme, onT
 
           {/* Avatar + identity */}
           <div className="flex flex-col items-center gap-3 text-center">
+            {/* Crop UI — shown when a new file is selected */}
+            {cropSrc ? (
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Drag to reposition</p>
+                <div
+                  className="h-32 w-32 cursor-grab overflow-hidden rounded-full border-2 border-violet-500/50 shadow-lg active:cursor-grabbing select-none"
+                  onPointerDown={onCropPointerDown}
+                  onPointerMove={onCropPointerMove}
+                  onPointerUp={onCropPointerUp}
+                >
+                  <img
+                    src={cropSrc}
+                    alt="crop preview"
+                    className="h-full w-full object-cover pointer-events-none"
+                    style={{ objectPosition: `${cropPos.x}% ${cropPos.y}%` }}
+                    draggable={false}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => void handleCropApply()}
+                    className="rounded border border-olive-500/40 bg-olive-500/15 px-3 py-1 text-[10px] font-semibold text-olive-400 transition hover:bg-olive-500/25"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    onClick={handleCropCancel}
+                    className="text-[10px] text-zinc-600 transition hover:text-zinc-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div className="relative">
               {avatarPreview ? (
                 <img
@@ -223,13 +335,44 @@ function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate, adminTheme, onT
                 </div>
               )}
             </div>
-            <button
-              onClick={() => fileRef.current?.click()}
-              disabled={avatarUploading}
-              className="text-[10px] font-semibold text-zinc-500 transition hover:text-olive-400 disabled:opacity-40"
-            >
-              Change photo
-            </button>
+            )}
+            {!cropSrc && (confirmRemoveAvatar ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-zinc-500">Remove photo?</span>
+                <button
+                  onClick={() => { setConfirmRemoveAvatar(false); void handleDeleteAvatar(); }}
+                  disabled={avatarUploading}
+                  className="rounded border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-40"
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => setConfirmRemoveAvatar(false)}
+                  className="text-[10px] text-zinc-600 transition hover:text-zinc-400"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  disabled={avatarUploading}
+                  className="text-[10px] font-semibold text-zinc-500 transition hover:text-olive-400 disabled:opacity-40"
+                >
+                  {avatarPreview ? 'Update photo' : 'Add photo'}
+                </button>
+                {avatarPreview && (
+                  <button
+                    onClick={() => setConfirmRemoveAvatar(true)}
+                    disabled={avatarUploading}
+                    className="text-[10px] font-semibold text-red-500/70 transition hover:text-red-400 disabled:opacity-40"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={(e) => void handleAvatarChange(e)} />
             <div>
               <p className="text-sm font-semibold text-zinc-100">{agent?.name ?? 'Agent'}</p>
@@ -392,7 +535,7 @@ export default function AdminLayout() {
               {agent?.role === 'admin' && (
                 <button
                   onClick={() => setInsightsOpen(true)}
-                  className="flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500 transition hover:text-violet-400"
+                  className="flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs font-semibold text-violet-400 transition hover:bg-violet-500/20 hover:border-violet-500/50"
                 >
                   <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3">
                     <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
@@ -416,50 +559,55 @@ export default function AdminLayout() {
               <span className={`block h-0.5 w-5 bg-zinc-400 transition-all ${mobileNavOpen ? '-translate-y-1.5 -rotate-45' : ''}`} />
             </button>
 
-            {/* Customer portal shortcut — icon-only */}
+            {/* Customer portal shortcut */}
             <Link
               to="/products"
-              className="hidden rounded border border-zinc-800 p-1.5 text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300 sm:block"
+              className="hidden items-center gap-1.5 rounded border border-zinc-800 px-2.5 py-1.5 text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300 sm:flex"
               title="Preview customer portal"
               aria-label="Preview customer portal"
             >
-              <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+              <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5 shrink-0">
                 <path d="M11 3H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                 <path d="M15 3h2v2M17 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
+              <span className="text-[10px] font-medium">Customer Portal</span>
             </Link>
-
-            <NotificationBell />
 
             {/* Store configuration — admin only */}
             {agent?.role === 'admin' && (
               <button
                 onClick={() => setSettingsOpen(true)}
-                className="rounded border border-zinc-800 p-1.5 text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300"
-                title="Store Configuration — affects all customers & agents"
+                className="hidden items-center gap-2 rounded border border-zinc-800 bg-zinc-900/60 px-2.5 py-1.5 text-left transition hover:border-zinc-700 sm:flex"
                 aria-label="Store configuration"
               >
-                <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+                <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5 shrink-0 text-zinc-500">
                   <path d="M10 13a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="1.5"/>
                   <path d="M10 2v1.5M10 16.5V18M2 10h1.5M16.5 10H18M4.1 4.1l1.06 1.06M14.84 14.84l1.06 1.06M4.1 15.9l1.06-1.06M14.84 5.16l1.06-1.06" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
+                <div>
+                  <p className="text-[8px] font-semibold uppercase tracking-widest text-zinc-600 leading-none">Platform-wide</p>
+                  <p className="text-[10px] font-semibold text-zinc-400 leading-snug">Store Configuration</p>
+                </div>
               </button>
             )}
 
-            {/* Agent identity — click to open profile panel */}
-            <button
-              onClick={() => setProfileOpen(true)}
-              className="flex items-center gap-2 rounded border border-zinc-800 bg-zinc-900 px-2 py-1 transition hover:border-zinc-700"
-            >
-              {agent?.avatarUrl ? (
-                <img src={agent.avatarUrl} alt={agent.name} className="h-6 w-6 rounded-full object-cover" />
-              ) : (
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-bold text-zinc-300">
-                  {initials}
-                </span>
-              )}
-              <span className="hidden text-[10px] text-zinc-500 sm:block">{agent?.name ?? 'Agent'}</span>
-            </button>
+            {/* Bell + agent identity — paired as one visual cluster */}
+            <div className="flex items-stretch rounded border border-zinc-800 bg-zinc-900 divide-x divide-zinc-800">
+              <NotificationBell inCluster />
+              <button
+                onClick={() => setProfileOpen(true)}
+                className="flex items-center gap-2 px-2 py-1 transition hover:bg-zinc-800/60"
+              >
+                {agent?.avatarUrl ? (
+                  <img src={agent.avatarUrl} alt={agent.name} className="h-6 w-6 rounded-full object-cover" />
+                ) : (
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-700 text-[9px] font-bold text-zinc-300">
+                    {initials}
+                  </span>
+                )}
+                <span className="hidden text-[10px] text-zinc-500 sm:block">{agent?.name ?? 'Agent'}</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -490,12 +638,25 @@ export default function AdminLayout() {
                 AI Insights
               </button>
             )}
+            {agent?.role === 'admin' && (
+              <button
+                onClick={() => { setSettingsOpen(true); setMobileNavOpen(false); }}
+                className="rounded border border-zinc-800 px-3 py-2.5 text-left text-sm font-medium text-zinc-500 transition hover:text-zinc-300"
+              >
+                <span className="block text-[9px] uppercase tracking-widest text-zinc-600">Platform-wide</span>
+                Store Configuration
+              </button>
+            )}
             <Link
               to="/products"
               onClick={() => setMobileNavOpen(false)}
-              className="mt-1 rounded border border-zinc-800 px-3 py-2.5 text-center text-sm font-medium text-zinc-500 transition hover:text-zinc-300"
+              className="mt-1 flex items-center gap-2 rounded border border-zinc-800 px-3 py-2.5 text-sm font-medium text-zinc-500 transition hover:text-zinc-300"
             >
-              Customer Portal
+              <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 shrink-0">
+                <path d="M11 3H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M15 3h2v2M17 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Preview Customer Portal
             </Link>
           </nav>
         </div>

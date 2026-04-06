@@ -8,6 +8,14 @@ export interface IUser {
   isAiAgent?: boolean;
   mustChangePassword?: boolean;
   avatarKey?: string;
+  lastActiveAt?: Date;
+  // AI performance rating
+  aiRating?:             number;   // 1–5
+  aiRatingExplanation?:  string;
+  aiRatingStrengths?:    string[];
+  aiRatingImprovements?: string[];
+  aiRatedAt?:            Date;
+  manualRating?:         number;   // 1–5, set by admin
 }
 
 export interface JwtPayload {

@@ -826,6 +826,12 @@ export interface StoreInsightsInput {
   topProducts:       { name: string; count: number; avgSentiment?: string }[];
   recentSummaries:   string[];                 // last 10 AI summaries
   unanalyzedCount:   number;
+  // Vendor / operational data
+  humanAgentCount:          number;
+  aiAssignedCount:          number;
+  unassignedOpenCount:      number;
+  orphanedHighPriorityCount:number;
+  noReplyOpenCount:         number;
 }
 
 export interface StoreInsightsResult {
@@ -836,13 +842,21 @@ export interface StoreInsightsResult {
   revenueRisks:         { risk: string; magnitude: 'high' | 'medium' | 'low'; mitigation: string }[];
   opportunities:        { opportunity: string; potentialImpact: string }[];
   priorityActions:      { rank: number; action: string; rationale: string }[];
+  vendorPerformance: {
+    operationalScore:  number;   // 0–10
+    summary:           string;
+    agentEfficiency:   { metric: string; reading: string; verdict: 'good' | 'ok' | 'concern' }[];
+    blindSpots:        { issue: string; impact: string; fix: string }[];
+    aiAgentRole:       { effectiveness: 'high' | 'medium' | 'low'; finding: string };
+    strengths:         string[];
+  };
 }
 
 const INSIGHTS_SYSTEM_PROMPT = `You are a senior marketing strategist and customer success expert analysing support ticket data for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
 
-Your role: turn raw support data into sharp, boardroom-ready insights. Think like a CMO reviewing the support queue — what does this data tell us about the health of the business, customer satisfaction, revenue risk, and growth opportunities?
+Your role: turn raw support data into sharp, boardroom-ready insights. Think like a CMO reviewing the support queue — what does this data tell us about the health of the business, customer satisfaction, revenue risk, growth opportunities, AND how well the support operation itself is running?
 
-You will receive aggregate statistics from the support ticket system including ticket volumes, customer sentiment, archetypes, refund/churn risk, top issues, and product patterns.
+You will receive aggregate statistics from the support ticket system including ticket volumes, customer sentiment, archetypes, refund/churn risk, top issues, product patterns, and operational metrics (agent count, unassigned tickets, response gaps, AI agent load).
 
 Return ONLY a JSON object with exactly these fields:
 {
@@ -862,7 +876,19 @@ Return ONLY a JSON object with exactly these fields:
   ],
   "priorityActions": [
     { "rank": 1, "action": "Most important thing to do right now.", "rationale": "Why this is #1." }
-  ]
+  ],
+  "vendorPerformance": {
+    "operationalScore": <number 0.0 to 10.0 — how efficiently the support team is operating>,
+    "summary": "2-3 sentences on support team performance: response coverage, agent workload, AI leverage, and critical gaps.",
+    "agentEfficiency": [
+      { "metric": "Metric name (e.g. High-priority coverage)", "reading": "Data-grounded observation (e.g. '3 high-priority tickets unassigned')", "verdict": "good|ok|concern" }
+    ],
+    "blindSpots": [
+      { "issue": "A gap or risk in the support operation.", "impact": "Business impact if left unaddressed.", "fix": "Concrete corrective action." }
+    ],
+    "aiAgentRole": { "effectiveness": "high|medium|low", "finding": "One sentence on how effectively the AI agent is absorbing ticket load and whether it is helping or creating bottlenecks." },
+    "strengths": ["One positive operational signal the team should keep doing.", "..."]
+  }
 }
 
 Rules:
@@ -871,6 +897,9 @@ Rules:
 - revenueRisks: 2–4 items
 - opportunities: 3–5 items
 - priorityActions: exactly 5 items (ranked 1–5)
+- vendorPerformance.agentEfficiency: 3–5 metrics
+- vendorPerformance.blindSpots: 2–4 items
+- vendorPerformance.strengths: 2–3 items
 - Be specific and numbers-driven where possible — cite the data
 - Think like a revenue-focused operator, not a support agent
 - If data is sparse (few tickets), say so in the summary and adjust confidence accordingly
@@ -878,6 +907,13 @@ Rules:
 Respond with valid JSON only. No markdown, no code fences.`;
 
 export async function generateStoreInsights(input: StoreInsightsInput): Promise<StoreInsightsResult> {
+  const responseGapPct = input.openTickets > 0
+    ? Math.round((input.noReplyOpenCount / input.openTickets) * 100)
+    : 0;
+  const aiLoadPct = input.totalTickets > 0
+    ? Math.round((input.aiAssignedCount / input.totalTickets) * 100)
+    : 0;
+
   const context = `
 Support Ticket Analytics:
 - Total tickets: ${input.totalTickets} (${input.openTickets} open, ${input.resolvedTickets} resolved)
@@ -896,6 +932,13 @@ Most-mentioned products: ${input.topProducts.slice(0, 8).map((p) => `${p.name} (
 
 Recent ticket summaries (sample of last 10):
 ${input.recentSummaries.slice(0, 10).map((s, i) => `${i + 1}. ${s}`).join('\n') || 'None available'}
+
+Operational / Vendor Metrics:
+- Human agents: ${input.humanAgentCount}
+- Tickets currently assigned to AI agent: ${input.aiAssignedCount} (${aiLoadPct}% of total)
+- Open tickets with no assignee: ${input.unassignedOpenCount}
+- Open high-priority tickets with no assignee (critical gap): ${input.orphanedHighPriorityCount}
+- Open tickets with zero replies (never been responded to): ${input.noReplyOpenCount} (${responseGapPct}% of open tickets)
 `.trim();
 
   const raw = await chatCompletion(INSIGHTS_SYSTEM_PROMPT, context, 45_000);
@@ -908,8 +951,17 @@ ${input.recentSummaries.slice(0, 10).map((s, i) => `${i + 1}. ${s}`).join('\n') 
     revenueRisks?: unknown;
     opportunities?: unknown;
     priorityActions?: unknown;
+    vendorPerformance?: {
+      operationalScore?: unknown;
+      summary?: unknown;
+      agentEfficiency?: unknown;
+      blindSpots?: unknown;
+      aiAgentRole?: unknown;
+      strengths?: unknown;
+    };
   };
   const p = JSON.parse(raw) as Raw;
+  const vp = p.vendorPerformance ?? {};
 
   return {
     storeHealthScore:  typeof p.storeHealthScore === 'number' ? Math.min(10, Math.max(0, p.storeHealthScore)) : 5,
@@ -919,6 +971,150 @@ ${input.recentSummaries.slice(0, 10).map((s, i) => `${i + 1}. ${s}`).join('\n') 
     revenueRisks:      Array.isArray(p.revenueRisks) ? (p.revenueRisks as {risk:string;magnitude:'high'|'medium'|'low';mitigation:string}[]) : [],
     opportunities:     Array.isArray(p.opportunities) ? (p.opportunities as {opportunity:string;potentialImpact:string}[]) : [],
     priorityActions:   Array.isArray(p.priorityActions) ? (p.priorityActions as {rank:number;action:string;rationale:string}[]) : [],
+    vendorPerformance: {
+      operationalScore: typeof vp.operationalScore === 'number' ? Math.min(10, Math.max(0, vp.operationalScore)) : 5,
+      summary:          typeof vp.summary === 'string' ? vp.summary : '',
+      agentEfficiency:  Array.isArray(vp.agentEfficiency) ? (vp.agentEfficiency as {metric:string;reading:string;verdict:'good'|'ok'|'concern'}[]) : [],
+      blindSpots:       Array.isArray(vp.blindSpots) ? (vp.blindSpots as {issue:string;impact:string;fix:string}[]) : [],
+      aiAgentRole:      vp.aiAgentRole && typeof vp.aiAgentRole === 'object'
+        ? (vp.aiAgentRole as {effectiveness:'high'|'medium'|'low';finding:string})
+        : { effectiveness: 'medium' as const, finding: '' },
+      strengths:        Array.isArray(vp.strengths) ? (vp.strengths as string[]) : [],
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Insights comparison
+// ---------------------------------------------------------------------------
+
+export interface InsightsComparisonResult {
+  verdict:          'improving' | 'stable' | 'declining';
+  healthScoreDelta: number;
+  summary:          string;
+  improvements:     { area: string; observation: string }[];
+  declines:         { area: string; observation: string }[];
+  newRisks:         string[];
+  resolvedIssues:   string[];
+}
+
+export async function compareInsightsSnapshots(
+  olderData: Record<string, unknown>,
+  olderDate: string,
+  newerData: Record<string, unknown>,
+  newerDate: string,
+): Promise<InsightsComparisonResult> {
+  const prompt = `You are a senior marketing analyst. Compare these two store insight reports and identify what changed, improved, or declined.
+
+OLDER REPORT (${olderDate}):
+${JSON.stringify(olderData, null, 2)}
+
+NEWER REPORT (${newerDate}):
+${JSON.stringify(newerData, null, 2)}
+
+Return ONLY a JSON object:
+{
+  "verdict": "improving|stable|declining",
+  "healthScoreDelta": <newer_score - older_score, e.g. 0.8>,
+  "summary": "2-3 sentence plain-language delta analysis. What is the trend?",
+  "improvements": [{ "area": "...", "observation": "What got better and why it matters." }],
+  "declines": [{ "area": "...", "observation": "What got worse and why it matters." }],
+  "newRisks": ["A risk that appears in the newer report but not the older one."],
+  "resolvedIssues": ["An issue from the older report that no longer appears in the newer one."]
+}
+
+Rules:
+- improvements: 0-4 items
+- declines: 0-4 items
+- newRisks: 0-3 items
+- resolvedIssues: 0-3 items
+- Be specific and cite score changes
+Respond with valid JSON only.`;
+
+  const raw = await chatCompletion(
+    'You are a precise business intelligence analyst. Respond with valid JSON only.',
+    prompt,
+    20_000,
+  );
+
+  type Raw = {
+    verdict?: unknown; healthScoreDelta?: unknown; summary?: unknown;
+    improvements?: unknown; declines?: unknown; newRisks?: unknown; resolvedIssues?: unknown;
+  };
+  const p = JSON.parse(raw) as Raw;
+  return {
+    verdict:          (p.verdict === 'improving' || p.verdict === 'declining') ? p.verdict : 'stable',
+    healthScoreDelta: typeof p.healthScoreDelta === 'number' ? p.healthScoreDelta : 0,
+    summary:          typeof p.summary === 'string' ? p.summary : '',
+    improvements:     Array.isArray(p.improvements) ? (p.improvements as {area:string;observation:string}[]) : [],
+    declines:         Array.isArray(p.declines) ? (p.declines as {area:string;observation:string}[]) : [],
+    newRisks:         Array.isArray(p.newRisks) ? (p.newRisks as string[]) : [],
+    resolvedIssues:   Array.isArray(p.resolvedIssues) ? (p.resolvedIssues as string[]) : [],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Agent AI rating
+// ---------------------------------------------------------------------------
+
+export interface AgentRatingResult {
+  rating:                number;   // 1–5
+  explanation:           string;
+  strengths:             string[];
+  areasForImprovement:   string[];
+}
+
+export async function rateAgentWithAI(metrics: {
+  name:           string;
+  assigned:       number;
+  resolved:       number;
+  replies:        number;
+  notes:          number;
+  recentReplies:  string[];
+}): Promise<AgentRatingResult> {
+  const resolutionRate = metrics.assigned > 0
+    ? Math.round((metrics.resolved / metrics.assigned) * 100)
+    : 0;
+
+  const prompt = `You are evaluating the performance of a customer support agent named "${metrics.name}" based on their activity metrics.
+
+Agent Metrics:
+- Total tickets assigned: ${metrics.assigned}
+- Tickets resolved: ${metrics.resolved} (${resolutionRate}% resolution rate)
+- Total replies sent: ${metrics.replies}
+- Internal notes written: ${metrics.notes}
+${metrics.recentReplies.length > 0 ? `\nSample recent replies:\n${metrics.recentReplies.slice(0, 5).map((r, i) => `${i + 1}. "${r.slice(0, 120)}"`).join('\n')}` : ''}
+
+Rate this agent from 1 to 5 stars and provide a professional assessment.
+
+Return ONLY a JSON object:
+{
+  "rating": <integer 1-5>,
+  "explanation": "2-3 sentence overall assessment citing specific metrics.",
+  "strengths": ["One concrete strength based on data."],
+  "areasForImprovement": ["One concrete area to improve based on data."]
+}
+
+Rules:
+- strengths: 1-3 items
+- areasForImprovement: 1-2 items
+- Be fair and constructive, cite actual numbers
+- If metrics are very low (< 5 tickets), note data sparsity and rate conservatively
+Respond with valid JSON only.`;
+
+  const raw = await chatCompletion(
+    'You are a fair and data-driven HR evaluator for a customer support team. Respond with valid JSON only.',
+    prompt,
+    10_000,
+  );
+
+  type Raw = { rating?: unknown; explanation?: unknown; strengths?: unknown; areasForImprovement?: unknown };
+  const p = JSON.parse(raw) as Raw;
+  return {
+    rating:               typeof p.rating === 'number' ? Math.min(5, Math.max(1, Math.round(p.rating))) : 3,
+    explanation:          typeof p.explanation === 'string' ? p.explanation : '',
+    strengths:            Array.isArray(p.strengths) ? (p.strengths as string[]) : [],
+    areasForImprovement:  Array.isArray(p.areasForImprovement) ? (p.areasForImprovement as string[]) : [],
   };
 }
 

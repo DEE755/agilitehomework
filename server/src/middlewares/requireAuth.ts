@@ -39,6 +39,8 @@ export async function requireAuth(
       email: user.email,
       role:  user.role,
     };
+    // Stamp last-seen timestamp (non-blocking)
+    void User.updateOne({ _id: user._id }, { $set: { lastActiveAt: new Date() } }).exec().catch(() => null);
     next();
   } catch {
     res.status(401).json({ error: 'Invalid or expired token' });

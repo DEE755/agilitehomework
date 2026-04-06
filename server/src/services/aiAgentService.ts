@@ -82,7 +82,7 @@ export async function runAiAgentPipeline(ticketId: string, force = false): Promi
             isAgent:     true,
           },
         },
-        $set: { status: 'resolved' },
+        $set: { status: 'resolved', aiResolvedAt: new Date() },
       });
 
     } else {

@@ -4,6 +4,7 @@ import type {
   PaginatedAdminTickets,
   Agent,
   AgentActivity,
+  AgentRating,
   AdminTicketFilters,
   AiTriageResult,
   AiSuggestReplyResult,
@@ -14,6 +15,9 @@ import type {
   CoachMessage,
   AppNotification,
   StoreInsightsResult,
+  InsightsSnapshotMeta,
+  InsightsSnapshot,
+  InsightsComparison,
 } from '../types/admin';
 import type { InternalNote } from '../types/admin';
 import type { Reply, TicketStatus, TicketPriority } from '../types/ticket';
@@ -167,7 +171,7 @@ export const adminApi = {
     return req('/profile/avatar/presign', { method: 'POST', body: JSON.stringify({ contentType }) });
   },
 
-  updateProfile(data: { avatarKey?: string }): Promise<{ data: { avatarUrl?: string } }> {
+  updateProfile(data: { avatarKey?: string | null }): Promise<{ data: { avatarUrl?: string } }> {
     return req('/profile', { method: 'PATCH', body: JSON.stringify(data) });
   },
 
@@ -177,6 +181,26 @@ export const adminApi = {
 
   emailAiInsights(): Promise<{ data: { sent: boolean } }> {
     return req('/ai-insights/email', { method: 'POST' });
+  },
+
+  insightsHistory(): Promise<{ data: InsightsSnapshotMeta[] }> {
+    return req('/ai-insights/history');
+  },
+
+  insightsSnapshot(id: string): Promise<{ data: InsightsSnapshot }> {
+    return req(`/ai-insights/history/${id}`);
+  },
+
+  compareInsights(idA: string, idB: string): Promise<{ data: InsightsComparison }> {
+    return req('/ai-insights/compare', { method: 'POST', body: JSON.stringify({ idA, idB }) });
+  },
+
+  aiRateAgent(agentId: string): Promise<{ data: AgentRating }> {
+    return req(`/agents/${agentId}/ai-rate`, { method: 'POST' });
+  },
+
+  updateAgentRating(agentId: string, rating: number): Promise<{ data: { manualRating: number } }> {
+    return req(`/agents/${agentId}/rating`, { method: 'PATCH', body: JSON.stringify({ rating }) });
   },
 
   deleteAgent(id: string): Promise<{ data: { deleted: boolean } }> {

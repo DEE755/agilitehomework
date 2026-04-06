@@ -21,7 +21,7 @@ const TYPE_ICON: Record<AppNotification['type'], string> = {
   ai_escalated:     '⚠',
 };
 
-export default function NotificationBell() {
+export default function NotificationBell({ inCluster = false }: { inCluster?: boolean }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -75,7 +75,11 @@ export default function NotificationBell() {
       {/* Bell button */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative rounded border border-zinc-800 p-1.5 text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300"
+        className={`relative p-1.5 text-zinc-500 transition hover:text-zinc-300 ${
+          inCluster
+            ? 'hover:bg-zinc-800/60'
+            : 'rounded border border-zinc-800 hover:border-zinc-700'
+        }`}
         aria-label="Notifications"
       >
         <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">

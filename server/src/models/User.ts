@@ -18,6 +18,13 @@ const userSchema = new Schema<UserDocument>(
     isAiAgent:          { type: Boolean, default: false },
     mustChangePassword: { type: Boolean, default: false },
     avatarKey:          { type: String, default: null },
+    lastActiveAt:       { type: Date,    default: null },
+    aiRating:             { type: Number, min: 1, max: 5, default: null },
+    aiRatingExplanation:  { type: String, default: null },
+    aiRatingStrengths:    { type: [String], default: [] },
+    aiRatingImprovements: { type: [String], default: [] },
+    aiRatedAt:            { type: Date,    default: null },
+    manualRating:         { type: Number, min: 1, max: 5, default: null },
   },
   { timestamps: true },
 );

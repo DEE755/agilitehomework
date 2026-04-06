@@ -26,6 +26,11 @@ import {
   updateProfile,
   getAiInsights,
   emailAiInsights,
+  listInsightsHistory,
+  getInsightsSnapshot,
+  compareInsights,
+  aiRateAgent,
+  updateAgentRating,
 } from '../controllers/admin.controller';
 
 const router = Router();
@@ -49,8 +54,13 @@ router.get('/agents/:agentId/activity', getAgentActivity);
 router.get('/tags',                listTags);
 router.get('/products',            listAdminProducts);
 router.get('/settings',            requireRole('admin'), getSettings);
-router.get('/ai-insights',         getAiInsights);
-router.post('/ai-insights/email',  emailAiInsights);
+router.get('/ai-insights',                    getAiInsights);
+router.post('/ai-insights/email',             emailAiInsights);
+router.get('/ai-insights/history',            listInsightsHistory);
+router.get('/ai-insights/history/:snapshotId', getInsightsSnapshot);
+router.post('/ai-insights/compare',           compareInsights);
+router.post('/agents/:agentId/ai-rate',       requireRole('admin'), aiRateAgent);
+router.patch('/agents/:agentId/rating',       requireRole('admin'), updateAgentRating);
 router.patch('/settings',          requireRole('admin'), updateSettings);
 router.patch('/profile/password',                     changePassword);
 router.patch('/profile',                              updateProfile);

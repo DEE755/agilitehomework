@@ -4,9 +4,10 @@ import bcrypt from 'bcryptjs';
 import { Ticket } from '../models/Ticket';
 import { User, AI_AGENT_EMAIL } from '../models/User';
 import { Product } from '../models/Product';
+import { InsightsSnapshot } from '../models/InsightsSnapshot';
 import { getOrCreateSettings } from '../models/Setting';
 import { runAiAgentPipeline } from '../services/aiAgentService';
-import { generateStoreInsights } from '../services/aiService';
+import { generateStoreInsights, compareInsightsSnapshots, rateAgentWithAI } from '../services/aiService';
 import type { TicketStatus, TicketPriority } from '../types/ticket.types';
 import type { AgentRole } from '../types/auth.types';
 import { attachReadUrls, getObjectUrl, createAvatarUpload } from '../services/storage';
@@ -67,8 +68,26 @@ export async function listAdminTickets(req: Request, res: Response): Promise<voi
     Ticket.countDocuments(filter),
   ]);
 
+  // Re-resolve product imageUrls from R2 (snapshot URLs expire after 15 min)
+  const slugs = [...new Set(
+    tickets
+      .map(t => (t.product as Record<string, unknown> | null | undefined)?.slug as string | undefined)
+      .filter((s): s is string => Boolean(s)),
+  )];
+  const imageUrlMap = new Map<string, string | null>();
+  await Promise.all(
+    slugs.map(async (slug) => {
+      imageUrlMap.set(slug, await getObjectUrl(`products/${slug}.jpg`) ?? null);
+    }),
+  );
+  const enrichedTickets = tickets.map((t) => {
+    const snap = t.product as Record<string, unknown> | null | undefined;
+    if (!snap?.slug) return t;
+    return { ...t, product: { ...snap, imageUrl: imageUrlMap.get(String(snap.slug)) ?? null } };
+  });
+
   res.json({
-    data: tickets,
+    data: enrichedTickets,
     meta: { total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
   });
 }
@@ -82,7 +101,12 @@ export async function getAdminTicket(req: Request, res: Response): Promise<void>
     .populate('assignedTo', 'name email');
   if (!ticket) { res.status(404).json({ error: 'Ticket not found' }); return; }
 
-  res.json({ data: await attachReadUrls(ticket.toObject()) });
+  const obj = await attachReadUrls(ticket.toObject());
+  const snap = obj.product as Record<string, unknown> | null | undefined;
+  if (snap?.slug) {
+    snap.imageUrl = await getObjectUrl(`products/${String(snap.slug)}.jpg`) ?? null;
+  }
+  res.json({ data: obj });
 }
 
 // PATCH /api/admin/tickets/:ticketId/priority
@@ -324,7 +348,15 @@ export async function getAgentActivity(req: Request, res: Response): Promise<voi
     notes:    notesCount,
   };
 
-  res.json({ data: { agent, stats, assignedTickets, recentReplies: repliesData } });
+  const rating = {
+    aiRating:             agent.aiRating ?? null,
+    aiRatingExplanation:  agent.aiRatingExplanation ?? null,
+    aiRatingStrengths:    agent.aiRatingStrengths ?? [],
+    aiRatingImprovements: agent.aiRatingImprovements ?? [],
+    aiRatedAt:            agent.aiRatedAt ?? null,
+    manualRating:         agent.manualRating ?? null,
+  };
+  res.json({ data: { agent, stats, assignedTickets, recentReplies: repliesData, rating } });
 }
 
 // POST /api/admin/agents/:agentId/resend-invite  (admin only)
@@ -553,6 +585,18 @@ export async function getAiInsights(req: Request, res: Response): Promise<void> 
     .slice(0, 20)
     .map((t) => t.aiSummary as string);
 
+  // Operational / vendor metrics
+  const aiAgentUser = await User.findOne({ isAiAgent: true }).select('_id').lean();
+  const aiAgentId   = aiAgentUser?._id;
+
+  const [humanAgentCount, aiAssignedCount, unassignedOpenCount, orphanedHighPriorityCount, noReplyOpenCount] = await Promise.all([
+    User.countDocuments({ isAiAgent: { $ne: true } }),
+    aiAgentId ? Ticket.countDocuments({ assignedTo: aiAgentId }) : Promise.resolve(0),
+    Ticket.countDocuments({ assignedTo: null, status: { $ne: 'resolved' } }),
+    Ticket.countDocuments({ assignedTo: null, aiPriority: 'high', status: { $ne: 'resolved' } }),
+    Ticket.countDocuments({ 'replies.0': { $exists: false }, status: { $ne: 'resolved' } }),
+  ]);
+
   try {
     const insights = await generateStoreInsights({
       totalTickets: total,
@@ -568,9 +612,33 @@ export async function getAiInsights(req: Request, res: Response): Promise<void> 
       topProducts,
       recentSummaries,
       unanalyzedCount: unanalyzed,
+      humanAgentCount,
+      aiAssignedCount,
+      unassignedOpenCount,
+      orphanedHighPriorityCount,
+      noReplyOpenCount,
     });
     const generatedAt = new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
     insightsCache = { data: insights, generatedAt, expiresAt: Date.now() + INSIGHTS_CACHE_TTL_MS };
+
+    // Persist snapshot to DB (fire-and-forget; cap at 100 entries)
+    void (async () => {
+      try {
+        await InsightsSnapshot.create({
+          data: insights,
+          metrics: { totalTickets: total, openTickets: open, resolvedTickets: resolved, humanAgentCount },
+          healthScore: insights.storeHealthScore,
+          generatedAt: new Date(),
+        });
+        // Prune oldest beyond 100
+        const count = await InsightsSnapshot.countDocuments();
+        if (count > 100) {
+          const oldest = await InsightsSnapshot.find().sort({ generatedAt: 1 }).limit(count - 100).select('_id').lean();
+          await InsightsSnapshot.deleteMany({ _id: { $in: oldest.map((d) => d._id) } });
+        }
+      } catch { /* non-critical */ }
+    })();
+
     res.json({ data: insights, generatedAt, cached: false });
   } catch (e) {
     res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to generate insights' });
@@ -590,11 +658,125 @@ export async function emailAiInsights(req: Request, res: Response): Promise<void
   }
 }
 
+// GET /api/admin/ai-insights/history
+export async function listInsightsHistory(_req: Request, res: Response): Promise<void> {
+  const snapshots = await InsightsSnapshot.find()
+    .select('healthScore generatedAt metrics')
+    .sort({ generatedAt: -1 })
+    .limit(50)
+    .lean();
+  res.json({ data: snapshots });
+}
+
+// GET /api/admin/ai-insights/history/:snapshotId
+export async function getInsightsSnapshot(req: Request, res: Response): Promise<void> {
+  const { snapshotId } = req.params;
+  if (!isValidObjectId(snapshotId)) { res.status(400).json({ error: 'Invalid ID' }); return; }
+  const snap = await InsightsSnapshot.findById(snapshotId).lean();
+  if (!snap) { res.status(404).json({ error: 'Snapshot not found' }); return; }
+  res.json({ data: snap });
+}
+
+// POST /api/admin/ai-insights/compare
+export async function compareInsights(req: Request, res: Response): Promise<void> {
+  const { idA, idB } = req.body as { idA?: string; idB?: string };
+  if (!idA || !idB) { res.status(400).json({ error: '"idA" and "idB" are required' }); return; }
+  if (!isValidObjectId(idA) || !isValidObjectId(idB)) { res.status(400).json({ error: 'Invalid snapshot ID' }); return; }
+
+  const [a, b] = await Promise.all([
+    InsightsSnapshot.findById(idA).lean(),
+    InsightsSnapshot.findById(idB).lean(),
+  ]);
+  if (!a || !b) { res.status(404).json({ error: 'One or both snapshots not found' }); return; }
+
+  // Ensure a is older and b is newer
+  const [older, newer] = new Date(a.generatedAt) <= new Date(b.generatedAt) ? [a, b] : [b, a];
+
+  try {
+    const comparison = await compareInsightsSnapshots(
+      older.data,
+      new Date(older.generatedAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }),
+      newer.data,
+      new Date(newer.generatedAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }),
+    );
+    res.json({ data: comparison });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'Comparison failed' });
+  }
+}
+
+// POST /api/admin/agents/:agentId/ai-rate
+export async function aiRateAgent(req: Request, res: Response): Promise<void> {
+  const { agentId } = req.params;
+  if (!isValidObjectId(agentId)) { res.status(400).json({ error: 'Invalid agent ID' }); return; }
+
+  const agent = await User.findById(agentId);
+  if (!agent) { res.status(404).json({ error: 'Agent not found' }); return; }
+  if (agent.isAiAgent) { res.status(400).json({ error: 'Cannot rate the AI agent' }); return; }
+
+  // Collect performance metrics
+  const [assigned, resolved, notesCount, repliesData] = await Promise.all([
+    Ticket.countDocuments({ assignedTo: agentId }),
+    Ticket.countDocuments({ assignedTo: agentId, status: 'resolved' }),
+    Ticket.countDocuments({ 'internalNotes.authorId': agentId }),
+    Ticket.aggregate([
+      { $match: { 'replies.authorEmail': agent.email, 'replies.isAgent': true } },
+      { $unwind: '$replies' },
+      { $match: { 'replies.authorEmail': agent.email, 'replies.isAgent': true } },
+      { $sort: { 'replies.createdAt': -1 } },
+      { $limit: 10 },
+      { $project: { _id: 0, body: '$replies.body' } },
+    ]),
+  ]);
+
+  try {
+    const result = await rateAgentWithAI({
+      name:          agent.name,
+      assigned,
+      resolved,
+      replies:       repliesData.length,
+      notes:         notesCount,
+      recentReplies: (repliesData as { body: string }[]).map((r) => r.body),
+    });
+
+    agent.aiRating             = result.rating;
+    agent.aiRatingExplanation  = result.explanation;
+    agent.aiRatingStrengths    = result.strengths;
+    agent.aiRatingImprovements = result.areasForImprovement;
+    agent.aiRatedAt            = new Date();
+    await agent.save();
+
+    res.json({ data: result });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'Rating failed' });
+  }
+}
+
+// PATCH /api/admin/agents/:agentId/rating  — admin manual override
+export async function updateAgentRating(req: Request, res: Response): Promise<void> {
+  const { agentId } = req.params;
+  const { rating } = req.body as { rating?: number };
+
+  if (!isValidObjectId(agentId)) { res.status(400).json({ error: 'Invalid agent ID' }); return; }
+  if (rating === null || rating === undefined || typeof rating !== 'number' || rating < 1 || rating > 5) {
+    res.status(400).json({ error: '"rating" must be a number between 1 and 5' });
+    return;
+  }
+
+  const agent = await User.findByIdAndUpdate(
+    agentId,
+    { manualRating: Math.round(rating) },
+    { new: true },
+  );
+  if (!agent) { res.status(404).json({ error: 'Agent not found' }); return; }
+  res.json({ data: { manualRating: agent.manualRating } });
+}
+
 // PATCH /api/admin/profile
 export async function updateProfile(req: Request, res: Response): Promise<void> {
   const agentId = req.agent?._id;
   if (!agentId) { res.status(401).json({ error: 'Unauthorized' }); return; }
-  const { avatarKey } = req.body as { avatarKey?: string };
+  const { avatarKey } = req.body as { avatarKey?: string | null };
   const user = await User.findById(agentId);
   if (!user) { res.status(404).json({ error: 'User not found' }); return; }
   if (avatarKey !== undefined) user.avatarKey = avatarKey;

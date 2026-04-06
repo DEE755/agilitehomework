@@ -7,6 +7,36 @@ import StatusBadge from '../../components/StatusBadge';
 
 const inputCls = 'w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-olive-500/60 focus:ring-1 focus:ring-olive-500/30';
 
+const ONLINE_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+
+type AgentStatus = 'online' | 'active' | 'pending';
+
+function agentStatus(agent: Agent): AgentStatus {
+  if (agent.isAiAgent) return 'active';
+  if (agent.mustChangePassword) return 'pending';
+  if (agent.lastActiveAt && Date.now() - new Date(agent.lastActiveAt).getTime() < ONLINE_THRESHOLD_MS) return 'online';
+  return 'active';
+}
+
+function StatusDot({ status }: { status: AgentStatus }) {
+  if (status === 'online') return (
+    <span className="relative flex h-2 w-2 shrink-0">
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-60" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+    </span>
+  );
+  if (status === 'pending') return (
+    <span className="h-2 w-2 shrink-0 rounded-full border border-amber-500/60 bg-amber-500/30" />
+  );
+  return <span className="h-2 w-2 shrink-0 rounded-full bg-zinc-700" />;
+}
+
+function StatusLabel({ status }: { status: AgentStatus }) {
+  if (status === 'online')  return <span className="text-[10px] font-semibold text-green-500">Connected</span>;
+  if (status === 'pending') return <span className="text-[10px] font-semibold text-amber-500">Pending setup</span>;
+  return null;
+}
+
 export default function AdminAgentsPage() {
   const { toast } = useToast();
   const currentAgent = getStoredAgent();
@@ -146,8 +176,9 @@ export default function AdminAgentsPage() {
                 </thead>
                 <tbody className="divide-y divide-zinc-800/60">
                   {agents.map((agent) => {
-                    const isSelf = agent._id === currentAgent?._id;
-                    const isAi   = agent.isAiAgent;
+                    const isSelf  = agent._id === currentAgent?._id;
+                    const isAi    = agent.isAiAgent;
+                    const status  = agentStatus(agent);
                     return (
                       <tr
                         key={agent._id}
@@ -156,18 +187,30 @@ export default function AdminAgentsPage() {
                       >
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-3">
-                            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold ${
-                              isAi
-                                ? 'border-violet-500/40 bg-violet-500/10 text-violet-400'
-                                : 'border-zinc-700 bg-zinc-800 text-zinc-300'
-                            }`}>
-                              {isAi ? '✦' : agent.name[0]?.toUpperCase()}
-                            </span>
+                            <div className="relative shrink-0">
+                              {isAi ? (
+                                <span className="flex h-8 w-8 items-center justify-center rounded-full border border-violet-500/40 bg-violet-500/10 text-xs font-bold text-violet-400">✦</span>
+                              ) : agent.avatarUrl ? (
+                                <img src={agent.avatarUrl} alt={agent.name} className="h-8 w-8 rounded-full object-cover border border-zinc-700" />
+                              ) : (
+                                <span className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-xs font-bold text-zinc-300">
+                                  {agent.name[0]?.toUpperCase()}
+                                </span>
+                              )}
+                              {!isAi && (
+                                <span className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center">
+                                  <StatusDot status={status} />
+                                </span>
+                              )}
+                            </div>
                             <div>
-                              <p className="font-medium text-zinc-200">
-                                {agent.name}
-                                {isSelf && <span className="ml-2 text-[10px] text-zinc-600">(you)</span>}
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-zinc-200">
+                                  {agent.name}
+                                  {isSelf && <span className="ml-1.5 text-[10px] text-zinc-600">(you)</span>}
+                                </p>
+                                <StatusLabel status={status} />
+                              </div>
                               <p className="text-xs text-zinc-600">{agent.email}</p>
                               <p className="mt-0.5 text-[10px] text-zinc-700 group-hover:text-olive-600 transition">
                                 View performance profile →
@@ -220,9 +263,12 @@ export default function AdminAgentsPage() {
                             ) : (
                               <button
                                 onClick={() => setConfirmDelete(agent._id)}
-                                className="rounded border border-zinc-800 px-2.5 py-1 text-[10px] font-semibold text-zinc-600 transition hover:border-red-500/30 hover:text-red-400"
+                                className="rounded border border-zinc-800 p-1.5 text-zinc-600 transition hover:border-red-500/30 hover:text-red-400"
+                                title="Remove agent"
                               >
-                                Remove
+                                <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
+                                  <path d="M2 4h12M5 4V2.5A.5.5 0 015.5 2h5a.5.5 0 01.5.5V4M6 7v5M10 7v5M3 4l1 9.5A.5.5 0 004.5 14h7a.5.5 0 00.5-.5L13 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
                               </button>
                             )}
                             </div>

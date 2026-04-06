@@ -16,6 +16,7 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import { Product, type ProductDocument } from '../models/Product';
 import { Ticket } from '../models/Ticket';
+import { getObjectUrl } from '../services/storage';
 
 // ── Env ────────────────────────────────────────────────────────────────────
 const envCandidates = [
@@ -127,6 +128,7 @@ async function main() {
       sku: finalSku,
       description: `${name} — quality product from our catalog.`,
       price: null,
+      imageKey: `products/${slug}.jpg`,
       isActive: true,
       sortOrder: 0,
     });
@@ -182,6 +184,16 @@ async function main() {
       continue;
     }
 
+    // Ensure product has an imageKey set (products/${slug}.jpg convention)
+    const expectedKey = `products/${bestProduct.slug}.jpg`;
+    if (!bestProduct.imageKey) {
+      await Product.updateOne({ _id: bestProduct._id }, { $set: { imageKey: expectedKey } });
+      bestProduct.imageKey = expectedKey;
+    }
+
+    // Resolve a current imageUrl (signed or public)
+    const imageUrl = bestProduct.imageKey ? (await getObjectUrl(bestProduct.imageKey)) ?? null : null;
+
     await Ticket.updateOne(
       { _id: ticket._id },
       {
@@ -192,7 +204,7 @@ async function main() {
             category:    bestProduct.category,
             description: bestProduct.description ?? null,
             price:       bestProduct.price ?? null,
-            imageUrl:    null,
+            imageUrl,
             slug:        bestProduct.slug ?? null,
           },
         },

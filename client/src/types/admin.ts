@@ -27,6 +27,8 @@ export interface Agent {
   role: AgentRole;
   isAiAgent?: boolean;
   avatarUrl?: string;
+  mustChangePassword?: boolean;
+  lastActiveAt?: string;
 }
 
 export interface InternalNote {
@@ -163,11 +165,42 @@ export interface AgentActivityStats {
   notes: number;
 }
 
+export interface AgentRating {
+  aiRating:             number | null;
+  aiRatingExplanation:  string | null;
+  aiRatingStrengths:    string[];
+  aiRatingImprovements: string[];
+  aiRatedAt:            string | null;
+  manualRating:         number | null;
+}
+
 export interface AgentActivity {
   agent: Agent;
   stats: AgentActivityStats;
   assignedTickets: AgentActivityTicket[];
   recentReplies: AgentActivityReply[];
+  rating: AgentRating;
+}
+
+export interface InsightsSnapshotMeta {
+  _id:         string;
+  healthScore: number;
+  generatedAt: string;
+  metrics: { totalTickets: number; openTickets: number; resolvedTickets: number; humanAgentCount: number };
+}
+
+export interface InsightsSnapshot extends InsightsSnapshotMeta {
+  data: StoreInsightsResult;
+}
+
+export interface InsightsComparison {
+  verdict:          'improving' | 'stable' | 'declining';
+  healthScoreDelta: number;
+  summary:          string;
+  improvements:     { area: string; observation: string }[];
+  declines:         { area: string; observation: string }[];
+  newRisks:         string[];
+  resolvedIssues:   string[];
 }
 
 export interface StoreInsightsResult {
@@ -178,6 +211,14 @@ export interface StoreInsightsResult {
   revenueRisks:      { risk: string; magnitude: 'high' | 'medium' | 'low'; mitigation: string }[];
   opportunities:     { opportunity: string; potentialImpact: string }[];
   priorityActions:   { rank: number; action: string; rationale: string }[];
+  vendorPerformance: {
+    operationalScore: number;
+    summary:          string;
+    agentEfficiency:  { metric: string; reading: string; verdict: 'good' | 'ok' | 'concern' }[];
+    blindSpots:       { issue: string; impact: string; fix: string }[];
+    aiAgentRole:      { effectiveness: 'high' | 'medium' | 'low'; finding: string };
+    strengths:        string[];
+  };
 }
 
 export interface CoachMessage {

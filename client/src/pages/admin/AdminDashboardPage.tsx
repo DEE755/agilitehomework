@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react';
 
 const PRODUCT_PALETTES = [
   { bg: 'bg-sky-500/20',     text: 'text-sky-300',     border: 'border-sky-500/30'     },
@@ -230,25 +230,85 @@ const STATUS_STYLE: Record<StatusFilter, { pill: string; text: string }> = {
 };
 
 function StatusPillSelector({ value, onChange }: { value: StatusFilter; onChange: (v: StatusFilter) => void }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [pillRect, setPillRect] = useState<{ left: number; width: number } | null>(null);
+  // Track drag state without re-renders
+  const drag = useRef<{ startX: number; active: boolean }>({ startX: 0, active: false });
+
   const activeIdx = STATUS_OPTS.findIndex((o) => o.value === value);
-  const count = STATUS_OPTS.length;
   const { pill, text } = STATUS_STYLE[value];
 
+  // Measure the active button's exact position and width → perfect pill alignment
+  useLayoutEffect(() => {
+    function measure() {
+      const container = containerRef.current;
+      const btn = btnRefs.current[activeIdx];
+      if (!container || !btn) return;
+      const cr = container.getBoundingClientRect();
+      const br = btn.getBoundingClientRect();
+      setPillRect({ left: br.left - cr.left + container.scrollLeft, width: br.width });
+    }
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [activeIdx]);
+
+  // Which button index is under a given clientX?
+  function idxAt(clientX: number): number {
+    for (let i = 0; i < btnRefs.current.length; i++) {
+      const btn = btnRefs.current[i];
+      if (!btn) continue;
+      const { left, right } = btn.getBoundingClientRect();
+      if (clientX >= left && clientX < right) return i;
+    }
+    return -1;
+  }
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    drag.current = { startX: e.clientX, active: false };
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.buttons === 0) return;
+    // Only start dragging after 6px of horizontal movement
+    if (!drag.current.active && Math.abs(e.clientX - drag.current.startX) < 6) return;
+    drag.current.active = true;
+    const idx = idxAt(e.clientX);
+    if (idx >= 0) onChange(STATUS_OPTS[idx].value);
+  }
+
+  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    const wasDrag = drag.current.active;
+    drag.current.active = false;
+    // Treat a non-drag release as a click on whichever button is under the pointer
+    if (!wasDrag) {
+      const idx = idxAt(e.clientX);
+      if (idx >= 0) onChange(STATUS_OPTS[idx].value);
+    }
+  }
+
   return (
-    <div className="relative flex overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900 scrollbar-none">
-      {/* Animated sliding pill */}
-      <div
-        className={`pointer-events-none absolute inset-y-1 rounded-md transition-all duration-300 ease-in-out ${pill}`}
-        style={{
-          width: `${100 / count}%`,
-          left: `${(activeIdx / count) * 100}%`,
-        }}
-      />
-      {/* Tab buttons */}
-      {STATUS_OPTS.map((opt) => (
+    <div
+      ref={containerRef}
+      className="relative flex overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900 scrollbar-none select-none"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+    >
+      {/* Sliding pill — positioned from real measured button rect */}
+      {pillRect && (
+        <div
+          className={`pointer-events-none absolute inset-y-1 rounded-md transition-all duration-200 ease-out ${pill}`}
+          style={{ left: pillRect.left, width: pillRect.width }}
+        />
+      )}
+      {/* Buttons */}
+      {STATUS_OPTS.map((opt, i) => (
         <button
           key={opt.value}
-          onClick={() => onChange(opt.value)}
+          ref={(el) => { btnRefs.current[i] = el; }}
           className={`relative z-10 flex-1 whitespace-nowrap px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors duration-200 ${
             value === opt.value ? text : 'text-zinc-500 hover:text-zinc-300'
           }`}

@@ -89,6 +89,7 @@ const ticketSchema = new Schema<TicketDocument>(
     aiAutoAssigned:      { type: Boolean, default: false },
     aiAssignedBy:        { type: Schema.Types.ObjectId, ref: 'User', default: null },
     aiEscalated:         { type: Boolean, default: false },
+    aiResolvedAt:        { type: Date,    default: null },   // set when AI pipeline resolves (not human)
     // Customer Intelligence fields — populated by POST /api/ai/customer-profile
     mktArchetype:           { type: String, default: null },
     mktArchetypeLabel:      { type: String, default: null },
