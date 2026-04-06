@@ -263,9 +263,19 @@ export default function AdminAgentsPage() {
                                 <StatusLabel status={status} lastActiveAt={agent.lastActiveAt} />
                               </div>
                               <p className="text-xs text-zinc-600">{agent.email}</p>
-                              <p className="mt-0.5 text-[10px] text-zinc-700 group-hover:text-olive-600 transition">
-                                View performance profile →
-                              </p>
+                              <div className="mt-0.5 flex items-center gap-2">
+                                <span className="text-[10px] text-zinc-700 group-hover:text-olive-600 transition">
+                                  View performance →
+                                </span>
+                                {!isAi && !isSelf && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setMsgTarget({ _id: agent._id, name: agent.name, avatarUrl: agent.avatarUrl }); }}
+                                    className="text-[10px] text-zinc-700 transition hover:text-sky-400"
+                                  >
+                                    · Chat
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>
