@@ -56,11 +56,11 @@ export interface AdminTicketSummary extends TicketSummary {
 export interface AdminTicketProduct {
   _id: string;
   name: string;
-  category: string;
-  sku: string;
-  slug?: string;
+  category?: string;
+  description?: string | null;
+  slug?: string | null;
   price?: number | null;
-  imageUrl?: string;
+  imageUrl?: string | null;
 }
 
 export interface AdminTicket extends Omit<Ticket, 'replies'> {
@@ -102,6 +102,7 @@ export interface AdminStats {
 
 export interface AppSettings {
   autoReplyEnabled: boolean;
+  activeTheme: string | null;
 }
 
 export interface AdminProduct {

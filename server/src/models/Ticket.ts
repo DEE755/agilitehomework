@@ -4,9 +4,19 @@ import type { IAttachment, ITicket, IReply, IInternalNote, TicketStatus, TicketP
 export interface AttachmentDocument extends IAttachment, Document {}
 export interface ReplyDocument extends IReply, Document {}
 export interface InternalNoteDocument extends IInternalNote, Document {}
+export interface IProductSnapshot {
+  _id: string;
+  name: string;
+  category?: string;
+  description?: string | null;
+  price?: number | null;
+  imageUrl?: string | null;
+  slug?: string | null;
+}
+
 export interface TicketDocument extends Omit<ITicket, 'assignedTo' | 'product'>, Document {
   assignedTo?: Types.ObjectId;
-  product?: Types.ObjectId | null;
+  product?: IProductSnapshot | null;
 }
 
 const attachmentSchema = new Schema<AttachmentDocument>(
@@ -56,7 +66,18 @@ const ticketSchema = new Schema<TicketDocument>(
     authorEmail:   { type: String, required: true, trim: true, lowercase: true },
     attachments:   { type: [attachmentSchema], default: [] },
     replies:       { type: [replySchema], default: [] },
-    product:       { type: Schema.Types.ObjectId, ref: 'Product', default: null },
+    product: {
+      type: new Schema({
+        _id:         { type: String, required: true },
+        name:        { type: String, required: true },
+        category:    { type: String, default: null },
+        description: { type: String, default: null },
+        price:       { type: Number, default: null },
+        imageUrl:    { type: String, default: null },
+        slug:        { type: String, default: null },
+      }, { _id: false }),
+      default: null,
+    },
     assignedTo:    { type: Schema.Types.ObjectId, ref: 'User', default: null },
     internalNotes: { type: [internalNoteSchema], default: [] },
     // AI triage fields — populated by POST /api/ai/triage-ticket

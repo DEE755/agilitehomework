@@ -652,11 +652,11 @@ export interface FinderCatalogItem {
 }
 
 export interface FinderProfile {
-  useCase:         string | null;
-  experienceLevel: string | null;
-  budget:          string | null;
-  environment:     string | null;
-  notes:           string | null;
+  useCase:  string | null;
+  style:    string | null;
+  budget:   string | null;
+  category: string | null;
+  notes:    string | null;
 }
 
 export interface FinderResponse {
@@ -672,15 +672,33 @@ function buildFinderSystemPrompt(catalog: FinderCatalogItem[]): string {
     .map((p) => `  - slug: "${p.slug}" | ${p.name}${p.price != null ? ` ($${p.price})` : ''} | ${p.category} | ${p.description.slice(0, 120)}`)
     .join('\n');
 
-  return `You are a friendly, knowledgeable product advisor for Agilite, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories. Your goal is to have a short, focused conversation to understand the customer's needs and recommend the perfect products.
+  return `You are a product advisor for Agilate, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories. Your goal is to have a short, focused conversation to understand the customer's needs and recommend the perfect products.
 
 Conversation rules:
 - Ask ONE question at a time, never multiple at once
 - Ask at most 4 questions before making recommendations — don't over-interview
-- Be warm, confident, and concise — like a trusted personal shopper, not a form
+- Be concise and helpful — focused on the customer's needs, not your own opinions
 - Always recommend 1–3 products maximum from the catalog below
 - Provide 2–4 quick reply chips when asking questions (short, tappable options)
 - After recommending, stay available for follow-up questions
+
+Tone rules — strictly follow these:
+- You are an AI assistant, not a person. Never express personal preferences, feelings, or opinions ("I love", "my favorite", "I find X fascinating", etc.)
+- Never say things like "great choice!" or "excellent!" in a sycophantic way — just be direct and helpful
+- Do not use filler phrases like "Absolutely!", "Of course!", "Certainly!" — just answer
+- Stay neutral and factual about products — describe their features and fit for the customer's needs, not your subjective take
+
+Question rules:
+- Only ask questions that help narrow down products that ACTUALLY EXIST in the catalog below
+- Do not ask about attributes (brand, specs, features) that no product in the catalog has
+- Look at the catalog first, identify what varies across products (category, price range, style), then ask only about those dimensions
+- If the catalog only has one product in a category, do not ask questions that can only lead there — just recommend it directly
+
+Recommendation rules — CRITICAL:
+- NEVER set phase to "recommending" with an empty recommendations array — this is forbidden
+- If you cannot find a matching product, pick the closest available ones and explain briefly why (e.g. "We don't carry exactly that, but here's the closest match:")
+- Always put at least 1 product slug in recommendations when phase is "recommending" or "following_up"
+- Only use slugs that exist verbatim in the catalog below
 
 Available catalog:
 ${catalogLines}
@@ -693,9 +711,9 @@ You MUST always respond with a single JSON object with EXACTLY these fields:
   "recommendations": [],
   "profile": {
     "useCase": null,
-    "experienceLevel": null,
+    "style": null,
     "budget": null,
-    "environment": null,
+    "category": null,
     "notes": null
   }
 }
@@ -758,17 +776,22 @@ export async function productFinderChat(
 
   const p = JSON.parse(match[0]) as RawFinder;
 
+  const recommendations = Array.isArray(p.recommendations) ? (p.recommendations as unknown[]).map(String).filter(Boolean) : [];
+  const rawPhase = (p.phase === 'recommending' || p.phase === 'following_up') ? p.phase : 'questioning';
+  // Safety net: never emit a "recommending" phase with no products
+  const phase = (rawPhase !== 'questioning' && recommendations.length === 0) ? 'questioning' : rawPhase;
+
   return {
     message:        typeof p.message === 'string' ? p.message : '',
     quickReplies:   Array.isArray(p.quickReplies) ? (p.quickReplies as unknown[]).map(String) : [],
-    phase:          (p.phase === 'recommending' || p.phase === 'following_up') ? p.phase : 'questioning',
-    recommendations: Array.isArray(p.recommendations) ? (p.recommendations as unknown[]).map(String) : [],
+    phase,
+    recommendations,
     profile: {
-      useCase:         typeof p.profile?.useCase         === 'string' ? p.profile.useCase         : null,
-      experienceLevel: typeof p.profile?.experienceLevel === 'string' ? p.profile.experienceLevel : null,
-      budget:          typeof p.profile?.budget          === 'string' ? p.profile.budget          : null,
-      environment:     typeof p.profile?.environment     === 'string' ? p.profile.environment     : null,
-      notes:           typeof p.profile?.notes           === 'string' ? p.profile.notes           : null,
+      useCase:  typeof p.profile?.useCase  === 'string' ? p.profile.useCase  : null,
+      style:    typeof (p.profile as Record<string, unknown>)?.style    === 'string' ? (p.profile as Record<string, unknown>).style as string    : null,
+      budget:   typeof p.profile?.budget   === 'string' ? p.profile.budget   : null,
+      category: typeof (p.profile as Record<string, unknown>)?.category === 'string' ? (p.profile as Record<string, unknown>).category as string : null,
+      notes:    typeof p.profile?.notes    === 'string' ? p.profile.notes    : null,
     },
   };
 }

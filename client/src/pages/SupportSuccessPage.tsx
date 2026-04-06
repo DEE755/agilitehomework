@@ -72,18 +72,12 @@ export default function SupportSuccessPage() {
           </div>
         )}
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-6">
           <Link
             to="/products"
             className="rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-zinc-300 transition hover:border-zinc-700 hover:text-white"
           >
             Back to Products
-          </Link>
-          <Link
-            to="/support/new"
-            className="rounded-lg border border-olive-500/40 bg-olive-500/15 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-olive-400 transition hover:bg-olive-500/25"
-          >
-            Open Another Request
           </Link>
         </div>
       </div>

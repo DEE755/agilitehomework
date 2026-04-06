@@ -65,7 +65,7 @@ export default function AdminLoginPage() {
               <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" fill="currentColor"/>
             </svg>
           </span>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Admin Access</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Agent Access</p>
         </div>
 
         {/* Form */}
@@ -127,9 +127,8 @@ export default function AdminLoginPage() {
           </Link>
           <button
             type="button"
-            onClick={() => login(ADMIN_EMAIL, ADMIN_PASSWORD)}
-            disabled={loading}
-            className="text-[10px] text-zinc-600 transition hover:text-zinc-400 disabled:opacity-50"
+            onClick={() => { setEmail(ADMIN_EMAIL); setPassword(ADMIN_PASSWORD); }}
+            className="text-[10px] text-zinc-600 transition hover:text-zinc-400"
           >
             Connect as admin
           </button>

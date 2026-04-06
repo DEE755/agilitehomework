@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { adminApi } from '../../services/adminApi';
 import type { AppSettings } from '../../types/admin';
+import { THEMES, applyTheme, getTheme } from '../../themes/seasonal';
 
 interface Props {
   open: boolean;
@@ -27,6 +28,9 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
   );
 }
 
+const JEWISH_THEMES  = THEMES.filter((t) => t.group === 'jewish');
+const COMMERCIAL_THEMES = THEMES.filter((t) => t.group === 'commercial');
+
 export default function SettingsPanel({ open, onClose }: Props) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [saving, setSaving]     = useState(false);
@@ -36,7 +40,11 @@ export default function SettingsPanel({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) return;
     adminApi.settings.get()
-      .then((res) => setSettings(res.data))
+      .then((res) => {
+        setSettings(res.data);
+        // Sync stored theme with server value on panel open
+        if (res.data.activeTheme) applyTheme(res.data.activeTheme);
+      })
       .catch((e: Error) => setError(e.message));
   }, [open]);
 
@@ -58,12 +66,32 @@ export default function SettingsPanel({ open, onClose }: Props) {
       const res = await adminApi.settings.update({ [key]: value });
       setSettings(res.data);
     } catch (e) {
-      setSettings(settings); // revert
+      setSettings(settings);
       setError((e as Error).message);
     } finally {
       setSaving(false);
     }
   }
+
+  async function setTheme(themeId: string) {
+    if (!settings) return;
+    // Apply immediately (optimistic, live preview)
+    applyTheme(themeId);
+    const optimistic = { ...settings, activeTheme: themeId === 'default' ? null : themeId };
+    setSettings(optimistic);
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await adminApi.settings.update({ activeTheme: themeId === 'default' ? null : themeId });
+      setSettings(res.data);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const activeTheme = settings?.activeTheme ?? 'default';
 
   return (
     <>
@@ -76,7 +104,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
       {/* Drawer */}
       <div
         ref={panelRef}
-        className={`fixed right-0 top-0 z-50 flex h-full w-80 flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl transition-transform duration-300 ${
+        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl transition-transform duration-300 ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -98,7 +126,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-6">
+        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-8">
           {error && (
             <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
               {error}
@@ -131,12 +159,107 @@ export default function SettingsPanel({ open, onClose }: Props) {
             </div>
           </div>
 
+          {/* Seasonal Theme section */}
+          <div>
+            <div className="mb-3 flex items-baseline justify-between">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-600">Storefront Theme</p>
+              {activeTheme !== 'default' && (
+                <button
+                  onClick={() => void setTheme('default')}
+                  className="text-[10px] text-zinc-600 transition hover:text-zinc-400"
+                >
+                  Reset to default
+                </button>
+              )}
+            </div>
+
+            {/* Active theme display */}
+            {activeTheme !== 'default' && (() => {
+              const t = getTheme(activeTheme);
+              return (
+                <div
+                  className="mb-4 overflow-hidden rounded-xl border border-zinc-700"
+                  style={{ background: t.banner?.gradient ?? '#18181b' }}
+                >
+                  <div className="px-4 py-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-white/50">Active theme</p>
+                    <p className="mt-0.5 text-sm font-bold text-white">
+                      {t.emoji} {t.name}
+                      {t.nameHe && <span className="ml-2 text-white/60">{t.nameHe}</span>}
+                    </p>
+                    {t.banner && (
+                      <p className="mt-1 text-[11px] text-white/70 leading-snug">{t.banner.text}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Jewish / Israeli holidays */}
+            <p className="mb-2 text-[9px] font-semibold uppercase tracking-widest text-zinc-700">Holidays</p>
+            <div className="grid grid-cols-2 gap-2">
+              {JEWISH_THEMES.map((theme) => {
+                const isActive = activeTheme === theme.id;
+                return (
+                  <button
+                    key={theme.id}
+                    onClick={() => void setTheme(theme.id)}
+                    disabled={saving}
+                    className={`group flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-xs transition disabled:opacity-50 ${
+                      isActive
+                        ? 'border-zinc-500 bg-zinc-800 text-zinc-100'
+                        : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                    }`}
+                  >
+                    {/* Color dot */}
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ background: theme.vars['--th-accent'] ?? '#6b7c3a' }}
+                    />
+                    <span className="flex-1 truncate font-medium">
+                      {theme.id === 'default' ? 'Default' : theme.name}
+                    </span>
+                    <span className="shrink-0">{theme.emoji}</span>
+                    {isActive && <span className="shrink-0 text-[9px] text-zinc-400">●</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Commercial moments */}
+            <p className="mb-2 mt-4 text-[9px] font-semibold uppercase tracking-widest text-zinc-700">Commercial</p>
+            <div className="grid grid-cols-2 gap-2">
+              {COMMERCIAL_THEMES.map((theme) => {
+                const isActive = activeTheme === theme.id;
+                return (
+                  <button
+                    key={theme.id}
+                    onClick={() => void setTheme(theme.id)}
+                    disabled={saving}
+                    className={`group flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-xs transition disabled:opacity-50 ${
+                      isActive
+                        ? 'border-zinc-500 bg-zinc-800 text-zinc-100'
+                        : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                    }`}
+                  >
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ background: theme.vars['--th-accent'] ?? '#6b7c3a' }}
+                    />
+                    <span className="flex-1 truncate font-medium">{theme.name}</span>
+                    <span className="shrink-0">{theme.emoji}</span>
+                    {isActive && <span className="shrink-0 text-[9px] text-zinc-400">●</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
         <div className="border-t border-zinc-800 px-5 py-4">
           <p className="text-[10px] text-zinc-700">
-            Changes take effect immediately for new tickets.
+            Theme changes apply to the storefront immediately. AI settings take effect on new tickets.
           </p>
         </div>
       </div>

@@ -23,6 +23,16 @@ export interface IInternalNote {
   createdAt?: Date;
 }
 
+export interface IProductSnapshot {
+  _id: string;
+  name: string;
+  category?: string;
+  description?: string | null;
+  price?: number | null;
+  imageUrl?: string | null;
+  slug?: string | null;
+}
+
 export interface ITicket {
   title: string;
   description: string;
@@ -32,7 +42,7 @@ export interface ITicket {
   authorEmail: string;
   attachments: IAttachment[];
   replies: IReply[];
-  product?: string; // ref: Product _id
+  product?: IProductSnapshot | null;
   assignedTo?: string; // ref: User _id
   internalNotes: IInternalNote[];
   // AI triage
@@ -67,6 +77,10 @@ export interface CreateTicketBody {
   productId?: string;
   productName?: string;
   productCategory?: string;
+  productDescription?: string;
+  productPrice?: number;
+  productImageUrl?: string;
+  productSlug?: string;
   attachments?: IAttachment[];
 }
 

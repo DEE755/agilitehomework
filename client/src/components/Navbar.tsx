@@ -20,7 +20,7 @@ export default function Navbar() {
             </svg>
           </span>
           <div>
-            <span className="block text-xs font-bold uppercase tracking-widest text-zinc-100">Agilite</span>
+            <span className="block text-xs font-bold uppercase tracking-widest text-zinc-100">Agilate</span>
             <span className="block text-[9px] uppercase tracking-widest text-zinc-600">Customer Support</span>
           </div>
         </NavLink>

@@ -135,7 +135,7 @@ export default function AdminAgentsPage() {
           )}
 
           {!loading && !error && (
-            <div className="overflow-hidden rounded-xl border border-zinc-800">
+            <div className="overflow-x-auto rounded-xl border border-zinc-800">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-zinc-800 bg-zinc-900/50">

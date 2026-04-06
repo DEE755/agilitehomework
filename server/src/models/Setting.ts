@@ -2,11 +2,13 @@ import { Schema, model, Document } from 'mongoose';
 
 export interface SettingDocument extends Document {
   autoReplyEnabled: boolean;
+  activeTheme: string | null;
 }
 
 const settingSchema = new Schema<SettingDocument>(
   {
     autoReplyEnabled: { type: Boolean, default: false },
+    activeTheme:      { type: String,  default: null },
   },
   { timestamps: true },
 );

@@ -18,7 +18,7 @@ function getActingAgent(req: Request) {
   return req.agent ?? {
     _id: 'support-team',
     name: 'Support Team',
-    email: 'support@agilite.com',
+    email: 'support@agilate.com',
     role: 'agent',
   };
 }
@@ -56,28 +56,16 @@ export async function listAdminTickets(req: Request, res: Response): Promise<voi
   const limitNum = Math.min(100, Math.max(1, parseInt(String(limit), 10)));
   const skip     = (pageNum - 1) * limitNum;
 
-  const [rawTickets, total] = await Promise.all([
+  const [tickets, total] = await Promise.all([
     Ticket.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum)
       .select('-replies -internalNotes')
       .populate('assignedTo', 'name email isAiAgent')
-      .populate('product', 'name category slug price imageKey')
       .lean(),
     Ticket.countDocuments(filter),
   ]);
-
-  // Resolve product imageKeys to signed URLs in parallel
-  const tickets = await Promise.all(
-    rawTickets.map(async (t) => {
-      const product = t.product as { _id: unknown; name: string; category: string; price?: number; imageKey?: string } | null | undefined;
-      if (!product?.imageKey) return t;
-      const imageUrl = await getObjectUrl(product.imageKey);
-      const { imageKey: _ik, ...productWithUrl } = product;
-      return { ...t, product: { ...productWithUrl, imageUrl: imageUrl ?? null } };
-    }),
-  );
 
   res.json({
     data: tickets,
@@ -91,20 +79,10 @@ export async function getAdminTicket(req: Request, res: Response): Promise<void>
   if (!isValidObjectId(ticketId)) { res.status(400).json({ error: 'Invalid ticket ID' }); return; }
 
   const ticket = await Ticket.findById(ticketId)
-    .populate('assignedTo', 'name email')
-    .populate('product', 'name category sku slug price imageKey');
+    .populate('assignedTo', 'name email');
   if (!ticket) { res.status(404).json({ error: 'Ticket not found' }); return; }
 
-  const obj = ticket.toObject() as ReturnType<typeof ticket.toObject> & {
-    product?: { name: string; category: string; sku: string; price?: number; imageKey?: string; imageUrl?: string } | null;
-  };
-
-  if (obj.product?.imageKey) {
-    obj.product.imageUrl = await getObjectUrl(obj.product.imageKey);
-    delete obj.product.imageKey;
-  }
-
-  res.json({ data: await attachReadUrls(obj) });
+  res.json({ data: await attachReadUrls(ticket.toObject()) });
 }
 
 // PATCH /api/admin/tickets/:ticketId/priority
@@ -400,20 +378,19 @@ export async function listTags(req: Request, res: Response): Promise<void> {
 // GET /api/admin/settings
 export async function getSettings(req: Request, res: Response): Promise<void> {
   const settings = await getOrCreateSettings();
-  res.json({ data: { autoReplyEnabled: settings.autoReplyEnabled } });
+  res.json({ data: { autoReplyEnabled: settings.autoReplyEnabled, activeTheme: settings.activeTheme ?? null } });
 }
 
 // PATCH /api/admin/settings
 export async function updateSettings(req: Request, res: Response): Promise<void> {
-  const { autoReplyEnabled } = req.body as { autoReplyEnabled?: boolean };
+  const { autoReplyEnabled, activeTheme } = req.body as { autoReplyEnabled?: boolean; activeTheme?: string | null };
 
   const settings = await getOrCreateSettings();
-  if (typeof autoReplyEnabled === 'boolean') {
-    settings.autoReplyEnabled = autoReplyEnabled;
-  }
+  if (typeof autoReplyEnabled === 'boolean') settings.autoReplyEnabled = autoReplyEnabled;
+  if (activeTheme !== undefined) settings.activeTheme = activeTheme ?? null;
   await settings.save();
 
-  res.json({ data: { autoReplyEnabled: settings.autoReplyEnabled } });
+  res.json({ data: { autoReplyEnabled: settings.autoReplyEnabled, activeTheme: settings.activeTheme ?? null } });
 }
 
 // GET /api/admin/notifications  — returns unread + recent 50 for the acting agent

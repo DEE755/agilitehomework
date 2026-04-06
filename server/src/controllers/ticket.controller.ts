@@ -53,7 +53,7 @@ export async function getTicket(req: Request, res: Response): Promise<void> {
 
 // POST /api/tickets
 export async function createTicket(req: Request, res: Response): Promise<void> {
-  const { title, description, authorName, authorEmail, productId, productName, productCategory } = req.body as CreateTicketBody;
+  const { title, description, authorName, authorEmail, productId, productName, productCategory, productDescription, productPrice, productImageUrl, productSlug } = req.body as CreateTicketBody;
 
   let attachments;
   try {
@@ -69,15 +69,19 @@ export async function createTicket(req: Request, res: Response): Promise<void> {
     authorName: string;
     authorEmail: string;
     attachments: typeof attachments;
-    product?: string;
+    product?: { _id: string; name: string; category?: string; description?: string | null; price?: number | null; imageUrl?: string | null; slug?: string | null };
   } = { title, description, authorName, authorEmail, attachments };
 
   if (productId && productName) {
-    // Only store product ref for MongoDB ObjectIds; external API products (numeric) have no DB document
-    if (isValidObjectId(productId)) {
-      ticketData.product = productId;
-    }
-    ticketData.title = `[${productName}] ${title}`;
+    ticketData.product = {
+      _id:         productId,
+      name:        productName,
+      category:    productCategory ?? null,
+      description: productDescription ?? null,
+      price:       productPrice ?? null,
+      imageUrl:    productImageUrl ?? null,
+      slug:        productSlug ?? null,
+    };
   }
 
   let ticket;

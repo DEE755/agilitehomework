@@ -89,18 +89,21 @@ export async function sendAgentWelcomeEmail(
   name: string,
   password: string,
 ): Promise<void> {
-  const subject = 'Your Agilite Support Workspace account';
+  const subject = 'Your Agilate Support Workspace account';
   const text = [
     `Hi ${name},`,
     '',
-    'An account has been created for you on the Agilite Support Workspace.',
+    'An account has been created for you on the Agilate Support Workspace.',
     '',
     `Email:    ${toEmail}`,
     `Password: ${password}`,
     '',
-    'Please log in and change your password as soon as possible.',
+    'Sign in here:',
+    `${APP_URL}/admin/login`,
     '',
-    '— Agilite',
+    'Please change your password after your first login.',
+    '',
+    '— Agilate',
   ].join('\n');
 
   await sendMailgunMessage(toEmail, subject, text);

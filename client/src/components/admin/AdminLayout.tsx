@@ -178,7 +178,7 @@ function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate }: {
         onClick={onClose}
       />
       <div
-        className={`fixed right-0 top-0 z-50 flex h-full w-80 flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
@@ -277,8 +277,9 @@ function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate }: {
 // ── Layout ────────────────────────────────────────────────────────────────────
 
 export default function AdminLayout() {
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [profileOpen,  setProfileOpen]  = useState(false);
+  const [settingsOpen,   setSettingsOpen]   = useState(false);
+  const [profileOpen,    setProfileOpen]    = useState(false);
+  const [mobileNavOpen,  setMobileNavOpen]  = useState(false);
   const navigate = useNavigate();
   const [agent, setAgent] = useState(getStoredAgent);
 
@@ -313,7 +314,7 @@ export default function AdminLayout() {
                 </svg>
               </span>
               <div>
-                <span className="block text-xs font-bold uppercase tracking-widest text-zinc-100">Agilite</span>
+                <span className="block text-xs font-bold uppercase tracking-widest text-zinc-100">Agilate</span>
                 <span className="block text-[9px] uppercase tracking-widest text-olive-600">Support Workspace</span>
               </div>
             </Link>
@@ -332,10 +333,20 @@ export default function AdminLayout() {
 
           {/* Right side */}
           <div className="flex items-center gap-2">
+            {/* Mobile hamburger */}
+            <button
+              className="flex flex-col gap-1 p-1.5 sm:hidden"
+              onClick={() => setMobileNavOpen((o) => !o)}
+              aria-label="Toggle navigation"
+            >
+              <span className={`block h-0.5 w-5 bg-zinc-400 transition-all ${mobileNavOpen ? 'translate-y-1.5 rotate-45' : ''}`} />
+              <span className={`block h-0.5 w-5 bg-zinc-400 transition-all ${mobileNavOpen ? 'opacity-0' : ''}`} />
+              <span className={`block h-0.5 w-5 bg-zinc-400 transition-all ${mobileNavOpen ? '-translate-y-1.5 -rotate-45' : ''}`} />
+            </button>
             <span className="hidden rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500 sm:inline-flex">
               Internal Staff Portal
             </span>
-            <Link to="/products" className="rounded border border-zinc-800 px-2.5 py-1.5 text-xs font-medium text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300">
+            <Link to="/products" className="hidden rounded border border-zinc-800 px-2.5 py-1.5 text-xs font-medium text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300 sm:block">
               Customer Portal
             </Link>
             <NotificationBell />
@@ -368,7 +379,36 @@ export default function AdminLayout() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      {/* Mobile nav dropdown */}
+      {mobileNavOpen && (
+        <div className="border-b border-zinc-800 bg-zinc-950 px-4 py-3 sm:hidden">
+          <nav className="flex flex-col gap-1">
+            <NavLink
+              to="/admin/tickets"
+              onClick={() => setMobileNavOpen(false)}
+              className={({ isActive }) => `rounded px-3 py-2.5 text-sm font-medium transition ${isActive ? 'bg-zinc-900 text-olive-400' : 'text-zinc-400 hover:text-zinc-100'}`}
+            >
+              Tickets
+            </NavLink>
+            <NavLink
+              to="/admin/agents"
+              onClick={() => setMobileNavOpen(false)}
+              className={({ isActive }) => `rounded px-3 py-2.5 text-sm font-medium transition ${isActive ? 'bg-zinc-900 text-olive-400' : 'text-zinc-400 hover:text-zinc-100'}`}
+            >
+              Agents
+            </NavLink>
+            <Link
+              to="/products"
+              onClick={() => setMobileNavOpen(false)}
+              className="mt-1 rounded border border-zinc-800 px-3 py-2.5 text-center text-sm font-medium text-zinc-500 transition hover:text-zinc-300"
+            >
+              Customer Portal
+            </Link>
+          </nav>
+        </div>
+      )}
+
+      <main className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
         <Outlet />
       </main>
 

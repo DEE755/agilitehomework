@@ -271,9 +271,13 @@ export default function CreateTicketPage() {
       const payload = {
         ...form,
         title: form.title,
-        productId:       selectedProduct?._id,
-        productName:     selectedProduct?.name,
-        productCategory: selectedProduct?.category,
+        productId:          selectedProduct?._id,
+        productName:        selectedProduct?.name,
+        productCategory:    selectedProduct?.category,
+        productDescription: selectedProduct?.description ?? undefined,
+        productPrice:       selectedProduct?.price ?? undefined,
+        productImageUrl:    selectedProduct?.imageUrl ?? undefined,
+        productSlug:        selectedProduct?.slug ?? undefined,
         attachments,
         // priority intentionally omitted — will be set by AI triage (see ticket.controller.ts)
       };
@@ -414,7 +418,7 @@ export default function CreateTicketPage() {
                 type="text"
                 value={aiQuestion}
                 onChange={(e) => setAiQuestion(e.target.value)}
-                placeholder="e.g. What size carry vest fits a 38&quot; chest?"
+                placeholder="e.g. Which product is best for my needs?"
                 disabled={aiAsk.stage === 'asking'}
                 autoFocus
                 className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-olive-500/20 disabled:opacity-50"

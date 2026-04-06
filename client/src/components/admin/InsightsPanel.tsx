@@ -63,7 +63,7 @@ function downloadReport(insights: StoreInsightsResult, generatedAt: string) {
     ...insights.opportunities.map((o) => `✦ ${o.opportunity}\n  Potential Impact: ${o.potentialImpact}`),
     ``,
     `──────────────────────────────────────���──`,
-    `Powered by Agilite AI Support Workspace`,
+    `Powered by Agilate AI Support Workspace`,
   ];
   const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
   const url  = URL.createObjectURL(blob);
@@ -169,7 +169,7 @@ export default function InsightsPanel({ open, onClose }: Props) {
       />
 
       <div
-        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-2xl flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl transition-transform duration-300 ${open ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-2xl flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl transition-transform duration-300 overflow-hidden ${open ? 'translate-x-0' : 'translate-x-full'}`}
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 px-6 py-4">

@@ -111,7 +111,7 @@ export default function ProductFinderWidget({ products, onSelectProduct }: Props
       {/* Floating trigger button */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2.5 rounded-full border border-olive-500/40 bg-zinc-950 px-5 py-3 text-sm font-semibold text-olive-400 shadow-2xl shadow-black/50 transition hover:border-olive-500/70 hover:bg-zinc-900"
+        className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full border border-olive-500/40 bg-zinc-950 px-4 py-2.5 text-xs font-semibold text-olive-400 shadow-2xl shadow-black/50 transition hover:border-olive-500/70 hover:bg-zinc-900 sm:bottom-6 sm:right-6 sm:gap-2.5 sm:px-5 sm:py-3 sm:text-sm"
       >
         <span className="text-base">✦</span>
         Help me choose
@@ -134,7 +134,7 @@ export default function ProductFinderWidget({ products, onSelectProduct }: Props
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-full border border-olive-500/40 bg-olive-500/10 text-sm">✦</div>
               <div>
-                <p className="text-sm font-semibold text-zinc-100">Gear Advisor</p>
+                <p className="text-sm font-semibold text-zinc-100">Product Advisor</p>
                 <p className="text-[10px] text-zinc-600">AI-powered product matching</p>
               </div>
             </div>
@@ -296,7 +296,7 @@ export default function ProductFinderWidget({ products, onSelectProduct }: Props
                 {loading ? '…' : '↑'}
               </button>
             </div>
-            <p className="mt-2 text-[9px] text-zinc-700">AI gear advisor · powered by Agilite</p>
+            <p className="mt-2 text-[9px] text-zinc-700">AI product advisor · powered by Agilate</p>
           </div>
         </div>
       )}

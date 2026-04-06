@@ -4,36 +4,26 @@ import { useProducts } from '../hooks/useProducts';
 import type { Product } from '../types/product';
 import ProductFinderWidget from '../components/ProductFinderWidget';
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'Body Armor':     'text-red-400 bg-red-500/10 border-red-500/20',
-  'Packs & Bags':   'text-sand-300 bg-sand-400/10 border-sand-400/20',
-  'Load Bearing':   'text-olive-400 bg-olive-500/10 border-olive-500/20',
-  'Hand Protection':'text-amber-400 bg-amber-500/10 border-amber-500/20',
-  'Protective Gear':'text-orange-400 bg-orange-500/10 border-orange-500/20',
-  'Communications': 'text-sky-400 bg-sky-500/10 border-sky-500/20',
-  'Hydration':      'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
-};
+const PRODUCT_PALETTES = [
+  { badge: 'text-sky-400 bg-sky-500/10 border-sky-500/20',      bg: 'bg-sky-500/10',     text: 'text-sky-300'     },
+  { badge: 'text-violet-400 bg-violet-500/10 border-violet-500/20', bg: 'bg-violet-500/10', text: 'text-violet-300' },
+  { badge: 'text-amber-400 bg-amber-500/10 border-amber-500/20', bg: 'bg-amber-500/10',   text: 'text-amber-300'   },
+  { badge: 'text-rose-400 bg-rose-500/10 border-rose-500/20',   bg: 'bg-rose-500/10',    text: 'text-rose-300'    },
+  { badge: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', bg: 'bg-emerald-500/10', text: 'text-emerald-300' },
+  { badge: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',   bg: 'bg-cyan-500/10',    text: 'text-cyan-300'    },
+  { badge: 'text-orange-400 bg-orange-500/10 border-orange-500/20', bg: 'bg-orange-500/10', text: 'text-orange-300' },
+  { badge: 'text-pink-400 bg-pink-500/10 border-pink-500/20',   bg: 'bg-pink-500/10',    text: 'text-pink-300'    },
+];
 
-const CATEGORY_PLACEHOLDER_BG: Record<string, string> = {
-  'Body Armor':     'from-red-900/40 to-zinc-900',
-  'Packs & Bags':   'from-stone-800/60 to-zinc-900',
-  'Load Bearing':   'from-olive-700/30 to-zinc-900',
-  'Hand Protection':'from-amber-900/30 to-zinc-900',
-  'Protective Gear':'from-orange-900/30 to-zinc-900',
-  'Communications': 'from-sky-900/30 to-zinc-900',
-  'Hydration':      'from-cyan-900/30 to-zinc-900',
-};
-
-function categoryStyle(cat: string) {
-  return CATEGORY_COLORS[cat] ?? 'text-zinc-400 bg-zinc-800 border-zinc-700';
-}
-
-function placeholderBg(cat: string) {
-  return CATEGORY_PLACEHOLDER_BG[cat] ?? 'from-zinc-800 to-zinc-900';
+function categoryPalette(cat: string) {
+  let h = 0;
+  for (let i = 0; i < cat.length; i++) h = (h * 31 + cat.charCodeAt(i)) & 0xffff;
+  return PRODUCT_PALETTES[h % PRODUCT_PALETTES.length];
 }
 
 function ProductImage({ product }: { product: Product }) {
   const [errored, setErrored] = useState(false);
+  const palette = categoryPalette(product.category);
 
   if (product.imageUrl && !errored) {
     return (
@@ -48,8 +38,10 @@ function ProductImage({ product }: { product: Product }) {
   }
 
   return (
-    <div className={`flex h-full w-full items-center justify-center bg-gradient-to-b ${placeholderBg(product.category)}`}>
-      <span className="text-3xl opacity-20 select-none">◈</span>
+    <div className={`flex h-full w-full items-center justify-center ${palette.bg}`}>
+      <span className={`text-5xl font-bold select-none opacity-40 ${palette.text}`}>
+        {product.name[0]?.toUpperCase()}
+      </span>
     </div>
   );
 }
@@ -78,7 +70,7 @@ function ProductCardSkeleton() {
 // ─── Related products (client-side, no AI call) ───────────────────────────────
 
 function getRelated(current: Product, all: Product[], max = 3): Product[] {
-  const others = all.filter((p) => p._id !== current._id);
+  const others = all.filter((p) => p._id !== current._id && !!p.imageUrl);
   const same  = others.filter((p) => p.category === current.category);
   const diff  = others.filter((p) => p.category !== current.category);
   const shuffle = <T,>(arr: T[]) => [...arr].sort(() => Math.random() - 0.5);
@@ -99,14 +91,13 @@ function ProductModal({ product, allProducts, onClose, onGetHelp, onSelect }: {
   const ref = useRef<HTMLDivElement>(null);
   const [imgErrored, setImgErrored] = useState(false);
   const related = getRelated(product, allProducts);
+  const palette = categoryPalette(product.category);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
-
-  const storeUrl = `https://www.agilite.com/products/${product.slug}`;
 
   return (
     <div
@@ -118,8 +109,8 @@ function ProductModal({ product, allProducts, onClose, onGetHelp, onSelect }: {
         ref={ref}
         className="relative z-10 flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl max-h-[90vh] overflow-y-auto"
       >
-        {/* Image */}
-        <div className="relative h-64 w-full shrink-0 overflow-hidden bg-zinc-800 sm:h-80">
+        {/* Header band */}
+        <div className={`relative flex h-48 w-full shrink-0 items-center justify-center sm:h-72 ${!product.imageUrl || imgErrored ? palette.bg : ''}`}>
           {product.imageUrl && !imgErrored ? (
             <img
               src={product.imageUrl}
@@ -128,15 +119,13 @@ function ProductModal({ product, allProducts, onClose, onGetHelp, onSelect }: {
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className={`flex h-full w-full items-center justify-center bg-gradient-to-b ${placeholderBg(product.category)}`}>
-              <span className="text-5xl opacity-20 select-none">◈</span>
-            </div>
+            <span className={`text-7xl font-bold select-none opacity-50 ${palette.text}`}>
+              {product.name[0]?.toUpperCase()}
+            </span>
           )}
-          {/* Category badge */}
-          <span className={`absolute bottom-3 left-3 rounded-full border px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wide backdrop-blur-sm ${categoryStyle(product.category)}`}>
+          <span className={`absolute bottom-3 left-3 rounded-full border px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wide backdrop-blur-sm ${palette.badge}`}>
             {product.category}
           </span>
-          {/* Close */}
           <button
             onClick={onClose}
             className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-zinc-700 bg-zinc-900/80 text-zinc-400 backdrop-blur-sm transition hover:text-zinc-100"
@@ -146,7 +135,7 @@ function ProductModal({ product, allProducts, onClose, onGetHelp, onSelect }: {
         </div>
 
         {/* Body */}
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-bold text-zinc-100">{product.name}</h2>
@@ -154,28 +143,22 @@ function ProductModal({ product, allProducts, onClose, onGetHelp, onSelect }: {
                 <p className="mt-1 text-lg font-semibold text-olive-400">${product.price}</p>
               )}
             </div>
-            <span className="shrink-0 font-mono text-[10px] text-zinc-700 mt-1">{product.sku}</span>
+            {product.sku && <span className="shrink-0 font-mono text-[10px] text-zinc-600 mt-1">{product.sku}</span>}
           </div>
 
           <p className="text-sm leading-relaxed text-zinc-400">{product.description}</p>
 
           {/* Actions */}
           <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
-            <a
-              href={storeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.preventDefault()}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-5 py-2.5 text-sm font-semibold text-zinc-200 transition hover:border-zinc-600 hover:text-white cursor-not-allowed"
-              title="Store link — coming soon"
+            <button
+              disabled
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-5 py-2.5 text-sm font-semibold text-zinc-200 cursor-not-allowed"
             >
-              <span>🛒</span>
-              Buy on Website
-              <span className="ml-1 rounded-full border border-zinc-600 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-zinc-600">soon</span>
-            </a>
+              🛒 Buy it
+            </button>
             <button
               onClick={() => { onClose(); onGetHelp(product); }}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-olive-500/40 bg-olive-500/15 px-5 py-2.5 text-sm font-semibold text-olive-400 transition hover:bg-olive-500/25"
+              className="th-btn flex flex-1 items-center justify-center gap-2 rounded-lg border px-5 py-2.5 text-sm font-semibold transition"
             >
               Get Help →
             </button>
@@ -185,25 +168,30 @@ function ProductModal({ product, allProducts, onClose, onGetHelp, onSelect }: {
           {related.length > 0 && (
             <div className="mt-6 border-t border-zinc-800 pt-5">
               <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Goes well with</p>
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {related.map((p) => (
-                  <button
-                    key={p._id}
-                    onClick={() => onSelect(p)}
-                    className="flex shrink-0 items-center gap-2.5 rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5 text-left transition hover:border-zinc-700 hover:bg-zinc-800/60"
-                  >
-                    {p.imageUrl ? (
-                      <img src={p.imageUrl} alt={p.name} className="h-12 w-12 shrink-0 rounded-lg object-cover" />
-                    ) : (
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-xl text-zinc-700">◈</div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="max-w-[120px] truncate text-xs font-semibold text-zinc-200">{p.name}</p>
-                      <p className="text-[10px] text-zinc-600">{p.category}</p>
-                      {p.price != null && <p className="text-[10px] font-semibold text-olive-400">${p.price}</p>}
-                    </div>
-                  </button>
-                ))}
+              <div className="grid grid-cols-3 gap-3">
+                {related.map((p) => {
+                  const rp = categoryPalette(p.category);
+                  return (
+                    <button
+                      key={p._id}
+                      onClick={() => onSelect(p)}
+                      className="flex flex-col items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5 text-center transition hover:border-zinc-700 hover:bg-zinc-800/60 w-full"
+                    >
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="h-12 w-12 rounded-lg object-cover" />
+                      ) : (
+                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-xl font-bold ${rp.bg} ${rp.text}`}>
+                          {p.name[0]?.toUpperCase()}
+                        </div>
+                      )}
+                      <div className="w-full min-w-0">
+                        <p className="truncate text-xs font-semibold text-zinc-200">{p.name}</p>
+                        <p className="text-[10px] text-zinc-600">{p.category}</p>
+                        {p.price != null && <p className="text-[10px] font-semibold text-olive-400">${p.price}</p>}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -223,7 +211,7 @@ export default function ProductsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { products: allProducts, loading, error, reload } = useProducts();
-  const products = allProducts.filter((p) => !!p.imageUrl && !p.name.toLowerCase().includes('produ'));
+  const products = allProducts.filter((p) => p.isActive !== false);
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [pageSize, setPageSize] = useState<PageSize>(8);
@@ -316,7 +304,7 @@ export default function ProductsPage() {
             onClick={() => handleFilterChange(() => setActiveCategory(cat))}
             className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
               activeCategory === cat
-                ? 'border-olive-500/40 bg-olive-500/15 text-olive-400'
+                ? 'th-btn border'
                 : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300'
             }`}
           >
@@ -365,7 +353,7 @@ export default function ProductsPage() {
               {/* Image */}
               <div className="relative h-44 overflow-hidden bg-zinc-800">
                 <ProductImage product={product} />
-                <span className={`absolute bottom-2.5 left-2.5 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide backdrop-blur-sm ${categoryStyle(product.category)}`}>
+                <span className={`absolute bottom-2.5 left-2.5 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide backdrop-blur-sm ${categoryPalette(product.category).badge}`}>
                   {product.category}
                 </span>
               </div>
@@ -387,19 +375,15 @@ export default function ProductsPage() {
                 </div>
 
                 <div className="mt-4 flex items-center justify-between gap-2 border-t border-zinc-800 pt-3" onClick={(e) => e.stopPropagation()}>
-                  <a
-                    href={`https://www.agilite.com/products/${product.slug}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.preventDefault()}
-                    className="rounded border border-zinc-700 px-3 py-1 text-xs font-medium text-zinc-500 transition hover:border-zinc-600 hover:text-zinc-300 cursor-not-allowed"
-                    title="Store link — coming soon"
+                  <button
+                    disabled
+                    className="rounded border border-zinc-700 px-3 py-1 text-xs font-medium text-zinc-300 cursor-not-allowed"
                   >
-                    🛒 Buy
-                  </a>
+                    🛒 Buy it
+                  </button>
                   <button
                     onClick={() => openTicket(product)}
-                    className="rounded border border-olive-500/30 bg-olive-500/10 px-3 py-1 text-xs font-semibold text-olive-400 transition hover:bg-olive-500/20 hover:text-olive-300"
+                    className="th-btn rounded border px-3 py-1 text-xs font-semibold transition"
                   >
                     Get Help
                   </button>

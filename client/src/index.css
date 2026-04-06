@@ -4,6 +4,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Seasonal theme CSS custom properties ─────────────────────────────────── */
+:root {
+  --th-accent:       #6b7c3a;
+  --th-accent-dim:   rgba(107, 124, 58, 0.13);
+  --th-accent-hover: rgba(107, 124, 58, 0.22);
+  --th-accent-text:  #8da05a;
+  --th-border:       rgba(107, 124, 58, 0.3);
+  --th-selection:    rgba(107, 124, 58, 0.3);
+}
+
 @layer base {
   html, body {
     @apply bg-zinc-950 text-zinc-100 antialiased;
@@ -11,7 +21,7 @@
   }
 
   ::selection {
-    background-color: rgba(107, 124, 58, 0.3);
+    background-color: var(--th-selection);
     color: #f4f4f5;
   }
 
@@ -28,11 +38,47 @@
 }
 
 @layer utilities {
+  /* Theme-aware primary button — replaces olive accent on themed pages */
+  .th-btn {
+    background-color: var(--th-accent-dim);
+    color: var(--th-accent-text);
+    border-color: var(--th-border);
+  }
+  .th-btn:hover {
+    background-color: var(--th-accent-hover);
+  }
+
+  /* Theme-aware text color */
+  .th-text {
+    color: var(--th-accent-text);
+  }
+
+  /* Seasonal banner strip */
+  .seasonal-banner {
+    position: relative;
+    overflow: hidden;
+  }
+  .seasonal-banner::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+    pointer-events: none;
+  }
+
   .toast-enter {
     animation: toast-in 0.2s ease-out;
   }
   @keyframes toast-in {
     from { opacity: 0; transform: translateY(8px) scale(0.97); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* Hide scrollbar but keep scrollability */
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 }
