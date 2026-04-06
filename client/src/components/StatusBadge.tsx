@@ -20,7 +20,7 @@ const labels: Record<TicketStatus, string> = {
 
 export default function StatusBadge({ status }: { status: TicketStatus }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${styles[status]}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${styles[status]}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${dots[status]}`} />
       {labels[status]}
     </span>

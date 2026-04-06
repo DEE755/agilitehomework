@@ -1,10 +1,11 @@
 /**
- * Backfill ticket product snapshots.
+ * Backfill ticket product snapshots using the Platzi Fake Store API.
  *
- * If the product catalog is empty, the script auto-creates products from the
- * product names embedded in ticket titles ("[Product Name] description"),
- * deducing categories and slugs.  Existing products (by slug) are never
- * duplicated.
+ * For every ticket whose product snapshot is missing category or image:
+ *   1. Extract the product name from the ticket title "[Name] …"
+ *   2. Fuzzy-match it against the external API's product list (title, category, images[0])
+ *   3. Write category + imageUrl back onto the ticket's embedded product snapshot
+ *   4. Also patch the internal Product document if one exists for that slug
  *
  * Usage (from server/ directory):
  *   npm run backfill:ticket-products
@@ -14,11 +15,10 @@ import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-import { Product, type ProductDocument } from '../models/Product';
+import { Product } from '../models/Product';
 import { Ticket } from '../models/Ticket';
-import { getObjectUrl } from '../services/storage';
 
-// ── Env ────────────────────────────────────────────────────────────────────
+// ── Env ─────────────────────────────────────────────────────────────────────
 const envCandidates = [
   path.resolve(process.cwd(), '.env'),
   path.resolve(process.cwd(), '../.env'),
@@ -27,28 +27,25 @@ for (const envPath of envCandidates) {
   if (fs.existsSync(envPath)) { dotenv.config({ path: envPath }); break; }
 }
 
-// ── Category deduction from product name keywords ──────────────────────────
-const CATEGORY_RULES: { keywords: string[]; category: string }[] = [
-  { keywords: ['cap', 'hat', 'beanie', 'bucket hat', 'snapback'],                     category: 'Headwear'    },
-  { keywords: ['t-shirt', 'tee', 'tank', 'crew neck', 'polo', 'henley', 'long sleeve'], category: 'Tops'       },
-  { keywords: ['hoodie', 'sweatshirt', 'pullover', 'zip-up', 'fleece'],               category: 'Outerwear'   },
-  { keywords: ['jacket', 'coat', 'parka', 'windbreaker', 'vest', 'bomber'],           category: 'Outerwear'   },
-  { keywords: ['shorts', 'chino', 'jogger', 'cargo', 'pants', 'trousers', 'jeans'],   category: 'Bottoms'     },
-  { keywords: ['shoes', 'sneaker', 'boots', 'sandal', 'loafer', 'slip-on'],           category: 'Footwear'    },
-  { keywords: ['backpack', 'bag', 'tote', 'duffel', 'crossbody', 'wallet', 'purse'],  category: 'Bags'        },
-  { keywords: ['watch', 'ring', 'necklace', 'bracelet', 'earring', 'accessory'],      category: 'Accessories' },
-  { keywords: ['controller', 'gaming', 'headset', 'keyboard', 'mouse', 'speaker',
-               'earbuds', 'cable', 'charger', 'phone', 'tablet', 'laptop'],           category: 'Electronics' },
-  { keywords: ['cup', 'bottle', 'mug', 'tumbler', 'flask', 'canteen'],               category: 'Drinkware'   },
-  { keywords: ['socks', 'underwear', 'boxers', 'briefs', 'gloves', 'scarf'],          category: 'Accessories' },
-];
+// ── External API types ───────────────────────────────────────────────────────
+interface ApiProduct {
+  id: number;
+  title: string;
+  slug: string;
+  price: number;
+  description: string;
+  images: string[];
+  category: {
+    id: number;
+    name: string;
+    slug: string;
+    image: string;
+  };
+}
 
-function deduceCategory(name: string): string {
-  const lower = name.toLowerCase();
-  for (const rule of CATEGORY_RULES) {
-    if (rule.keywords.some((kw) => lower.includes(kw))) return rule.category;
-  }
-  return 'Apparel'; // safe default
+// ── String helpers ───────────────────────────────────────────────────────────
+function norm(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
 }
 
 function toSlug(name: string): string {
@@ -61,11 +58,7 @@ function toSlug(name: string): string {
 }
 
 function toSku(name: string): string {
-  return name
-    .toUpperCase()
-    .replace(/[^A-Z0-9 ]/g, '')
-    .replace(/\s+/g, '-')
-    .slice(0, 24);
+  return name.toUpperCase().replace(/[^A-Z0-9 ]/g, '').replace(/\s+/g, '-').slice(0, 24);
 }
 
 /** Extract product name from "[Name] rest of title" */
@@ -74,22 +67,34 @@ function extractBracketName(title: string): string | null {
   return m ? m[1].trim() : null;
 }
 
-/** How similar is this product name to the query? */
-function norm(s: string) {
-  return s.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
-}
-
-function matchScore(product: ProductDocument, query: string): number {
+/** Fuzzy match score between a query string and an API product title */
+function matchScore(apiTitle: string, query: string): number {
   const nq = norm(query);
-  const np = norm(product.name);
-  if (np === nq) return 100;
-  if (np.includes(nq) || nq.includes(np)) return 80;
+  const nt = norm(apiTitle);
+  if (nt === nq) return 100;
+  if (nt.includes(nq) || nq.includes(nt)) return 80;
   const qWords = new Set(nq.split(' ').filter((w) => w.length > 2));
-  const shared = np.split(' ').filter((w) => w.length > 2 && qWords.has(w)).length;
+  const shared = nt.split(' ').filter((w) => w.length > 2 && qWords.has(w)).length;
   return shared * 20;
 }
 
-// ── Main ───────────────────────────────────────────────────────────────────
+/** Pick the best matching API product for a given name, or null if score < 20 */
+function findBestApiMatch(name: string, apiProducts: ApiProduct[]): ApiProduct | null {
+  let best: ApiProduct | null = null;
+  let bestScore = 0;
+  for (const ap of apiProducts) {
+    const score = matchScore(ap.title, name);
+    if (score > bestScore) { bestScore = score; best = ap; }
+  }
+  return bestScore >= 20 ? best : null;
+}
+
+/** Clean up image URLs — the API sometimes wraps them in ["url"] strings */
+function cleanImageUrl(raw: string): string {
+  return raw.replace(/^\[?"?/, '').replace(/"?\]?$/, '').trim();
+}
+
+// ── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   const uri = process.env.MONGODB_URI;
   if (!uri) throw new Error('MONGODB_URI not set');
@@ -97,51 +102,17 @@ async function main() {
   await mongoose.connect(uri);
   console.log('✓ Connected to MongoDB');
 
+  // ── Fetch external product catalog ────────────────────────────────────────
+  console.log('  Fetching https://api.escuelajs.co/api/v1/products …');
+  const res = await fetch('https://api.escuelajs.co/api/v1/products?limit=200');
+  if (!res.ok) throw new Error(`API returned ${res.status}`);
+  const apiProducts: ApiProduct[] = await res.json() as ApiProduct[];
+  console.log(`✓ Got ${apiProducts.length} products from external API`);
+
+  // ── Load all tickets ──────────────────────────────────────────────────────
   const tickets = await Ticket.find({}).lean();
-  console.log(`✓ Loaded ${tickets.length} tickets`);
+  console.log(`✓ Loaded ${tickets.length} tickets\n`);
 
-  // ── Step 1: collect all unique product names from ticket titles ──────────
-  const namesFromTitles = new Set<string>();
-  for (const t of tickets) {
-    const n = extractBracketName(t.title);
-    if (n) namesFromTitles.add(n);
-  }
-  console.log(`✓ Found ${namesFromTitles.size} unique product names in ticket titles`);
-
-  // ── Step 2: ensure all those products exist in the catalog ───────────────
-  let created = 0;
-  for (const name of namesFromTitles) {
-    const slug = toSlug(name);
-    const existing = await Product.findOne({ slug }).lean();
-    if (existing) continue;
-
-    const category = deduceCategory(name);
-    const sku = toSku(name);
-    // Make sure SKU is unique by appending a suffix if needed
-    const existingSku = await Product.findOne({ sku }).lean();
-    const finalSku = existingSku ? `${sku}-${Date.now().toString().slice(-4)}` : sku;
-
-    await Product.create({
-      slug,
-      name,
-      category,
-      sku: finalSku,
-      description: `${name} — quality product from our catalog.`,
-      price: null,
-      imageKey: `products/${slug}.jpg`,
-      isActive: true,
-      sortOrder: 0,
-    });
-    console.log(`  + Created product: "${name}" [${category}]`);
-    created++;
-  }
-  if (created > 0) console.log(`✓ Created ${created} missing products`);
-
-  // ── Step 3: reload full catalog ──────────────────────────────────────────
-  const products = await Product.find({ isActive: true }).lean<ProductDocument[]>();
-  console.log(`✓ Catalog now has ${products.length} active products\n`);
-
-  // ── Step 4: link tickets ─────────────────────────────────────────────────
   let updated = 0;
   let skipped = 0;
   let unmatched = 0;
@@ -149,73 +120,91 @@ async function main() {
   for (const ticket of tickets) {
     const snap = ticket.product as Record<string, unknown> | null | undefined;
 
-    // Already fully populated?
-    if (snap && snap._id && snap.name && snap.category) {
+    // Skip if already fully populated with category + imageUrl
+    if (snap && snap.category && snap.imageUrl) {
       skipped++;
       continue;
     }
 
-    let bestProduct: ProductDocument | null = null;
-    let bestScore = 0;
-
+    // Try to extract product name from bracket title, fall back to snap.name
     const bracketName = extractBracketName(ticket.title);
-    if (bracketName) {
-      for (const p of products) {
-        const score = matchScore(p, bracketName);
-        if (score > bestScore) { bestScore = score; bestProduct = p; }
-      }
-    }
+    const queryName = bracketName ?? (snap?.name as string | undefined);
 
-    if (!bestProduct && snap && snap._id) {
-      const byId = products.find((p) => String(p._id) === String(snap._id));
-      if (byId) { bestProduct = byId; bestScore = 90; }
-    }
-
-    if (!bestProduct && snap && snap.name) {
-      for (const p of products) {
-        const score = matchScore(p, String(snap.name));
-        if (score > bestScore) { bestScore = score; bestProduct = p; }
-      }
-    }
-
-    if (!bestProduct || bestScore < 20) {
-      console.log(`  ✗ No match  "${ticket.title.slice(0, 60)}"`);
+    if (!queryName) {
+      console.log(`  ✗ No name  "${ticket.title.slice(0, 60)}"`);
       unmatched++;
       continue;
     }
 
-    // Ensure product has an imageKey set (products/${slug}.jpg convention)
-    const expectedKey = `products/${bestProduct.slug}.jpg`;
-    if (!bestProduct.imageKey) {
-      await Product.updateOne({ _id: bestProduct._id }, { $set: { imageKey: expectedKey } });
-      bestProduct.imageKey = expectedKey;
+    const match = findBestApiMatch(queryName, apiProducts);
+
+    if (!match) {
+      console.log(`  ✗ No match  "${queryName}" (ticket: "${ticket.title.slice(0, 50)}")`);
+      unmatched++;
+      continue;
     }
 
-    // Resolve a current imageUrl (signed or public)
-    const imageUrl = bestProduct.imageKey ? (await getObjectUrl(bestProduct.imageKey)) ?? null : null;
+    const imageUrl = match.images[0] ? cleanImageUrl(match.images[0]) : null;
+    const category = match.category.name;
+    const slug = snap?.slug as string | undefined ?? toSlug(match.title);
 
-    await Ticket.updateOne(
-      { _id: ticket._id },
-      {
-        $set: {
-          product: {
-            _id:         String(bestProduct._id),
-            name:        bestProduct.name,
-            category:    bestProduct.category,
-            description: bestProduct.description ?? null,
-            price:       bestProduct.price ?? null,
-            imageUrl,
-            slug:        bestProduct.slug ?? null,
-          },
-        },
-      },
-    );
-    console.log(`  ✓ Linked  "${ticket.title.slice(0, 50)}" → ${bestProduct.name}`);
+    // Build merged product snapshot
+    const newSnap = {
+      _id:         snap?._id ?? undefined,
+      name:        (snap?.name as string | undefined) ?? match.title,
+      category,
+      description: (snap?.description as string | undefined) ?? match.description,
+      price:       (snap?.price as number | undefined) ?? match.price,
+      imageUrl,
+      slug,
+    };
+
+    await Ticket.updateOne({ _id: ticket._id }, { $set: { product: newSnap } });
+
+    console.log(`  ✓ Updated  "${queryName}" → category="${category}" image=${imageUrl ? '✓' : '✗'}`);
     updated++;
+
+    // Also patch the internal Product document if it exists (by slug or name)
+    const internalProduct = await Product.findOne({
+      $or: [{ slug }, { name: newSnap.name }],
+    });
+    if (internalProduct) {
+      const patch: Record<string, unknown> = {};
+      if (!internalProduct.category || internalProduct.category === 'Apparel') {
+        patch.category = category;
+      }
+      // Store the external URL directly as imageKey only if no R2 key set
+      if (!internalProduct.imageKey && imageUrl) {
+        patch.imageKey = imageUrl; // will be used as fallback if R2 key absent
+      }
+      if (internalProduct.price == null && match.price) {
+        patch.price = match.price;
+      }
+      if (Object.keys(patch).length) {
+        await Product.updateOne({ _id: internalProduct._id }, { $set: patch });
+        console.log(`    ↳ Patched internal Product "${internalProduct.name}"`);
+      }
+    } else {
+      // Create a minimal internal Product so the admin catalog is populated
+      const sku = toSku(match.title);
+      const existingSku = await Product.findOne({ sku }).lean();
+      const finalSku = existingSku ? `${sku}-${Date.now().toString().slice(-4)}` : sku;
+      await Product.create({
+        slug,
+        name:        match.title,
+        category,
+        sku:         finalSku,
+        description: match.description,
+        price:       match.price,
+        imageKey:    imageUrl ?? null,
+        isActive:    true,
+        sortOrder:   0,
+      });
+      console.log(`    ↳ Created internal Product "${match.title}"`);
+    }
   }
 
   console.log(`\n─── Summary ─────────────────────────────────`);
-  console.log(`  Products created: ${created}`);
   console.log(`  Tickets updated:  ${updated}`);
   console.log(`  Tickets skipped:  ${skipped} (already complete)`);
   console.log(`  Unmatched:        ${unmatched}`);
