@@ -30,6 +30,22 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Logfire HTTP request tracing
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warning' : 'info';
+    logfire[level](`${req.method} ${req.path} → ${res.statusCode}`, {
+      method:      req.method,
+      path:        req.path,
+      status:      res.statusCode,
+      duration_ms: duration,
+    });
+  });
+  next();
+});
+
 app.get('/', (_req, res) => {
   res.json({ status: 'API IS ACTIVE', version: '1.0.0' });
 });
