@@ -216,10 +216,15 @@ export async function agentReply(req: Request, res: Response): Promise<void> {
     isAgent:     true,
   });
   if (ticket.status !== 'in_progress') ticket.status = 'in_progress';
+  // Auto-assign to the replying agent if ticket is currently unassigned
+  if (!ticket.assignedTo && isValidObjectId(String(agent._id))) {
+    ticket.assignedTo = agent._id as unknown as typeof ticket.assignedTo;
+  }
   await ticket.save();
+  await ticket.populate('assignedTo', 'name email isAiAgent');
 
   const reply = ticket.replies[ticket.replies.length - 1];
-  res.status(201).json({ data: reply });
+  res.status(201).json({ data: { reply, assignedTo: ticket.assignedTo } });
 
   void sendAgentReplyEmail(ticket.authorEmail, ticket.authorName, String(ticket._id), ticket.title, body.trim())
     .catch((err: unknown) => console.error('[agentReply] reply email failed:', err));
