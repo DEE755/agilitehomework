@@ -54,6 +54,7 @@ export interface ITicket {
   aiAutoAssigned?: boolean;
   aiAssignedBy?: string | null;
   aiEscalated?: boolean;
+  aiResolvedAt?: Date | null;
   // Customer Intelligence
   mktArchetype?: string | null;
   mktArchetypeLabel?: string | null;

@@ -780,7 +780,7 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
   const { avatarKey } = req.body as { avatarKey?: string | null };
   const user = await User.findById(agentId);
   if (!user) { res.status(404).json({ error: 'User not found' }); return; }
-  if (avatarKey !== undefined) user.avatarKey = avatarKey;
+  if (avatarKey !== undefined) user.avatarKey = avatarKey ?? undefined;
   await user.save();
   const avatarUrl = user.avatarKey ? await getObjectUrl(user.avatarKey) : undefined;
   res.json({ data: { avatarUrl } });

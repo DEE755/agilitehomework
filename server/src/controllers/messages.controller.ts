@@ -41,7 +41,7 @@ export async function listConversations(req: Request, res: Response) {
   // Populate agent details for each partner
   const agentIds = rows.map((r) => r._id);
   const agents = await User.find({ _id: { $in: agentIds } })
-    .select('name avatarUrl')
+    .select('name avatarKey')
     .lean();
   const agentMap = new Map(agents.map((a) => [String(a._id), a]));
 
@@ -51,7 +51,7 @@ export async function listConversations(req: Request, res: Response) {
     return {
       agentId:     String(r._id),
       agentName:   agent?.name ?? 'Unknown',
-      agentAvatar: agent?.avatarUrl ?? null,
+      agentAvatar: agent?.avatarKey ?? null,
       lastBody:    last.body,
       lastAt:      last.createdAt,
       unreadCount: r.unreadCount,
@@ -83,14 +83,14 @@ export async function getConversation(req: Request, res: Response) {
     { $set: { readAt: new Date() } },
   ).exec().catch(() => null);
 
-  const partner = await User.findById(partnerId).select('name avatarUrl').lean();
+  const partner = await User.findById(partnerId).select('name avatarKey').lean();
 
   return res.json({
     data: {
       agent: {
         _id:       String(partnerId),
         name:      partner?.name ?? 'Unknown',
-        avatarUrl: partner?.avatarUrl ?? null,
+        avatarUrl: partner?.avatarKey ?? null,
       },
       messages: messages.map((m) => ({
         _id:         String(m._id),
