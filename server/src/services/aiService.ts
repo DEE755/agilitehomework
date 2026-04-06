@@ -33,16 +33,19 @@ export interface SuggestReplyResult {
 // Config
 // ---------------------------------------------------------------------------
 
-function getAiConfig() {
+function getAiConfig(modelOverride?: string) {
   const apiKey = process.env.PYDANTIC_AI_GATEWAY_API_KEY ?? process.env.PYDANTIC_GATEWAY_API_KEY ?? '';
   const region = process.env.PYDANTIC_GATEWAY_REGION ?? 'us';
-  const model  = process.env.PYDANTIC_ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
+  const model  = modelOverride ?? process.env.PYDANTIC_ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
 
   if (!apiKey) throw new Error('PYDANTIC_AI_GATEWAY_API_KEY is not configured');
 
   const url = `https://gateway-${region}.pydantic.dev/proxy/bedrock/model/${region}.anthropic.${model}/converse`;
   return { url, apiKey };
 }
+
+// Faster model for bulk/structured tasks that don't need full Sonnet reasoning
+const INSIGHTS_MODEL = process.env.PYDANTIC_INSIGHTS_MODEL ?? 'claude-haiku-4-5-20251001';
 
 // ---------------------------------------------------------------------------
 // Raw gateway call — Bedrock Converse API format
@@ -83,8 +86,8 @@ async function chatRaw(
   }
 }
 
-async function chatCompletion(systemPrompt: string, userContent: string, timeoutMs = 30_000): Promise<string> {
-  const { url, apiKey } = getAiConfig();
+async function chatCompletion(systemPrompt: string, userContent: string, timeoutMs = 30_000, modelOverride?: string): Promise<string> {
+  const { url, apiKey } = getAiConfig(modelOverride);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -941,7 +944,7 @@ Operational / Vendor Metrics:
 - Open tickets with zero replies (never been responded to): ${input.noReplyOpenCount} (${responseGapPct}% of open tickets)
 `.trim();
 
-  const raw = await chatCompletion(INSIGHTS_SYSTEM_PROMPT, context, 120_000);
+  const raw = await chatCompletion(INSIGHTS_SYSTEM_PROMPT, context, 120_000, INSIGHTS_MODEL);
 
   type Raw = {
     storeHealthScore?: unknown;
