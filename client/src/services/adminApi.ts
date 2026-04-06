@@ -18,6 +18,10 @@ import type {
   InsightsSnapshotMeta,
   InsightsSnapshot,
   InsightsComparison,
+  AgentConversation,
+  AgentMessage,
+  AgentMessageTicketRef,
+  AgentMessageProductRef,
 } from '../types/admin';
 import type { InternalNote } from '../types/admin';
 import type { Reply, TicketStatus, TicketPriority } from '../types/ticket';
@@ -241,6 +245,26 @@ export const adminApi = {
     },
     markAllRead(): Promise<{ data: { ok: boolean } }> {
       return req('/notifications/read-all', { method: 'PATCH' });
+    },
+  },
+
+  messages: {
+    unreadCount(): Promise<{ data: { count: number } }> {
+      return req('/messages/unread-count');
+    },
+    conversations(): Promise<{ data: AgentConversation[] }> {
+      return req('/messages/conversations');
+    },
+    conversation(agentId: string): Promise<{ data: { agent: Pick<Agent, '_id' | 'name' | 'avatarUrl'>; messages: AgentMessage[] } }> {
+      return req(`/messages/conversations/${agentId}`);
+    },
+    send(payload: {
+      toId: string;
+      body: string;
+      ticketRefs?: AgentMessageTicketRef[];
+      productRefs?: AgentMessageProductRef[];
+    }): Promise<{ data: AgentMessage }> {
+      return req('/messages', { method: 'POST', body: JSON.stringify(payload) });
     },
   },
 

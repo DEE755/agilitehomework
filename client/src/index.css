@@ -37,11 +37,11 @@
     width: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #18181b;
+    background: #0e1018;
   }
   ::-webkit-scrollbar-thumb {
     border-radius: 9999px;
-    background: #3f3f46;
+    background: #272b42;
   }
 }
 
@@ -107,6 +107,57 @@
     display: none;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ADMIN DARK MODE — REFINED PALETTE
+   Shift from pure-black zinc to a deep midnight blue-slate for better depth,
+   eye comfort, and visual hierarchy.
+
+   ROLLBACK: git checkout fb1cbeb -- client/src/index.css
+   OR: delete this entire block (between the ═══ markers)
+
+   Original values for reference:
+     bg-zinc-950 #09090b  bg-zinc-900 #18181b  bg-zinc-800 #27272a
+     border-zinc-800 #27272a  text-zinc-100 #f4f4f5  scrollbar #18181b/#3f3f46
+   ═══════════════════════════════════════════════════════════════════════════ */
+#admin-root:not(.admin-light) {
+  background-color: #0b0d14;
+}
+#admin-root:not(.admin-light) ::-webkit-scrollbar-track { background: #0e1018; }
+#admin-root:not(.admin-light) ::-webkit-scrollbar-thumb { background: #272b42; border-radius: 9999px; }
+
+/* Surface layers — three distinct elevations */
+#admin-root:not(.admin-light) .bg-zinc-950      { background-color: #0b0d14 !important; }
+#admin-root:not(.admin-light) .bg-zinc-950\/95  { background-color: rgba(11,13,20,0.97) !important; }
+#admin-root:not(.admin-light) .bg-zinc-900      { background-color: #121520 !important; }
+#admin-root:not(.admin-light) .bg-zinc-900\/40  { background-color: rgba(18,21,32,0.5) !important; }
+#admin-root:not(.admin-light) .bg-zinc-900\/60  { background-color: rgba(18,21,32,0.75) !important; }
+#admin-root:not(.admin-light) .bg-zinc-800      { background-color: #1a1e2e !important; }
+#admin-root:not(.admin-light) .bg-zinc-700      { background-color: #22273a !important; }
+
+/* Borders */
+#admin-root:not(.admin-light) .border-zinc-800  { border-color: #1e2235 !important; }
+#admin-root:not(.admin-light) .border-zinc-700  { border-color: #2b3050 !important; }
+
+/* Text — soft blue-white scale, easier on eyes than pure white */
+#admin-root:not(.admin-light) .text-zinc-100    { color: #e1e4f5 !important; }
+#admin-root:not(.admin-light) .text-zinc-200    { color: #c4c8e0 !important; }
+#admin-root:not(.admin-light) .text-zinc-300    { color: #9ea4c0 !important; }
+#admin-root:not(.admin-light) .text-zinc-400    { color: #7880a0 !important; }
+#admin-root:not(.admin-light) .text-zinc-500    { color: #555c7a !important; }
+#admin-root:not(.admin-light) .text-zinc-600    { color: #404665 !important; }
+#admin-root:not(.admin-light) .text-zinc-700    { color: #30365a !important; }
+
+/* Placeholder */
+#admin-root:not(.admin-light) .placeholder-zinc-600::placeholder { color: #404665 !important; }
+
+/* Hover states */
+#admin-root:not(.admin-light) .hover\:bg-zinc-800:hover      { background-color: #1a1e2e !important; }
+#admin-root:not(.admin-light) .hover\:bg-zinc-900\/60:hover  { background-color: rgba(18,21,32,0.75) !important; }
+#admin-root:not(.admin-light) .hover\:border-zinc-700:hover  { border-color: #2b3050 !important; }
+#admin-root:not(.admin-light) .hover\:text-zinc-100:hover    { color: #e1e4f5 !important; }
+#admin-root:not(.admin-light) .hover\:text-zinc-200:hover    { color: #c4c8e0 !important; }
+#admin-root:not(.admin-light) .hover\:text-zinc-300:hover    { color: #9ea4c0 !important; }
 
 /* ── Admin light mode ─────────────────────────────────────────────────────── */
 /* Scoped to #admin-root so the customer storefront is never affected.        */

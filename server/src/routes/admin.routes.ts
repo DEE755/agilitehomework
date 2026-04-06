@@ -32,6 +32,12 @@ import {
   aiRateAgent,
   updateAgentRating,
 } from '../controllers/admin.controller';
+import {
+  getUnreadCount,
+  listConversations,
+  getConversation,
+  sendMessage,
+} from '../controllers/messages.controller';
 
 const router = Router();
 
@@ -68,5 +74,10 @@ router.post('/profile/avatar/presign',                presignAvatarUpload);
 router.get('/notifications',                          listNotifications);
 router.patch('/notifications/read-all',               markAllNotificationsRead);
 router.patch('/notifications/:notificationId/read',   markNotificationRead);
+
+router.get('/messages/unread-count',                  getUnreadCount);
+router.get('/messages/conversations',                 listConversations);
+router.get('/messages/conversations/:agentId',        getConversation);
+router.post('/messages',                              sendMessage);
 
 export default router;

@@ -226,6 +226,39 @@ export interface CoachMessage {
   content: string;
 }
 
+export interface AgentConversation {
+  agentId:     string;
+  agentName:   string;
+  agentAvatar: string | null;
+  lastBody:    string;
+  lastAt:      string;
+  unreadCount: number;
+  isFromMe:    boolean;
+}
+
+export interface AgentMessageTicketRef {
+  ticketId: string;
+  title:    string;
+  status:   string;
+}
+
+export interface AgentMessageProductRef {
+  productId: string;
+  name:      string;
+  imageUrl?: string | null;
+}
+
+export interface AgentMessage {
+  _id:         string;
+  fromId:      string;
+  toId:        string;
+  body:        string;
+  ticketRefs:  AgentMessageTicketRef[];
+  productRefs: AgentMessageProductRef[];
+  readAt:      string | null;
+  createdAt:   string;
+}
+
 export type AdminTicketFilters = {
   status?: TicketStatus | 'all' | 'unresolved';
   priority?: TicketPriority | 'all';

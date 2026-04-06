@@ -3,6 +3,7 @@ import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom';
 import SettingsPanel from './SettingsPanel';
 import InsightsPanel from './InsightsPanel';
 import NotificationBell from './NotificationBell';
+import MessagesPanel from './MessagesPanel';
 import { adminApi, getStoredAgent } from '../../services/adminApi';
 import { useToast } from '../Toast';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -474,6 +475,8 @@ function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate, adminTheme, onT
 export default function AdminLayout() {
   const [settingsOpen,   setSettingsOpen]   = useState(false);
   const [insightsOpen,   setInsightsOpen]   = useState(false);
+  const [messagesOpen,   setMessagesOpen]   = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const [profileOpen,    setProfileOpen]    = useState(false);
   const [mobileNavOpen,  setMobileNavOpen]  = useState(false);
   const navigate = useNavigate();
@@ -593,6 +596,21 @@ export default function AdminLayout() {
 
             {/* Bell + agent identity — paired as one visual cluster */}
             <div className="flex items-stretch rounded border border-zinc-800 bg-zinc-900 divide-x divide-zinc-800">
+              {/* Messages icon */}
+              <button
+                onClick={() => setMessagesOpen(true)}
+                className="relative flex items-center px-2.5 py-1.5 text-zinc-500 transition hover:bg-zinc-800/60 hover:text-zinc-300"
+                aria-label="Messages"
+              >
+                <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+                  <path d="M17 10c0 3.866-3.134 7-7 7a6.973 6.973 0 01-3.5-.937L3 17l.937-3.5A6.973 6.973 0 013 10c0-3.866 3.134-7 7-7s7 3.134 7 7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                </svg>
+                {unreadMessages > 0 && (
+                  <span className="absolute top-1 right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-sky-500 text-[8px] font-bold text-white">
+                    {unreadMessages > 9 ? '9+' : unreadMessages}
+                  </span>
+                )}
+              </button>
               <NotificationBell inCluster />
               <button
                 onClick={() => setProfileOpen(true)}
@@ -668,6 +686,11 @@ export default function AdminLayout() {
 
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <InsightsPanel open={insightsOpen} onClose={() => setInsightsOpen(false)} />
+      <MessagesPanel
+        open={messagesOpen}
+        onClose={() => setMessagesOpen(false)}
+        onUnreadChange={setUnreadMessages}
+      />
       <ProfilePanel
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
