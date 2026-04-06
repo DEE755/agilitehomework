@@ -537,6 +537,18 @@ export default function AdminLayout() {
               </NavLink>
               {agent?.role === 'admin' && (
                 <button
+                  onClick={() => setSettingsOpen(true)}
+                  className="flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500 transition hover:text-zinc-200"
+                >
+                  <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3 shrink-0">
+                    <path d="M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" strokeWidth="1.3"/>
+                    <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
+                  Settings
+                </button>
+              )}
+              {agent?.role === 'admin' && (
+                <button
                   onClick={() => setInsightsOpen(true)}
                   className="flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-xs font-semibold text-violet-400 transition hover:bg-violet-500/20 hover:border-violet-500/50"
                 >
@@ -576,25 +588,8 @@ export default function AdminLayout() {
               <span className="text-[10px] font-medium">Customer Portal</span>
             </Link>
 
-            {/* Store configuration — admin only */}
-            {agent?.role === 'admin' && (
-              <button
-                onClick={() => setSettingsOpen(true)}
-                className="hidden items-center gap-2 rounded border border-zinc-800 bg-zinc-900/60 px-2.5 py-1.5 text-left transition hover:border-zinc-700 sm:flex"
-                aria-label="Store configuration"
-              >
-                <svg viewBox="0 0 20 20" fill="none" className="h-3.5 w-3.5 shrink-0 text-zinc-500">
-                  <path d="M10 13a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M10 2v1.5M10 16.5V18M2 10h1.5M16.5 10H18M4.1 4.1l1.06 1.06M14.84 14.84l1.06 1.06M4.1 15.9l1.06-1.06M14.84 5.16l1.06-1.06" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-                <div>
-                  <p className="text-[8px] font-semibold uppercase tracking-widest text-zinc-600 leading-none">Platform-wide</p>
-                  <p className="text-[10px] font-semibold text-zinc-400 leading-snug">Store Configuration</p>
-                </div>
-              </button>
-            )}
 
-            {/* Bell + agent identity — paired as one visual cluster */}
+{/* Bell + agent identity — paired as one visual cluster */}
             <div className="flex items-stretch rounded border border-zinc-800 bg-zinc-900 divide-x divide-zinc-800">
               {/* Messages icon */}
               <button
@@ -650,19 +645,25 @@ export default function AdminLayout() {
             </NavLink>
             {agent?.role === 'admin' && (
               <button
-                onClick={() => { setInsightsOpen(true); setMobileNavOpen(false); }}
-                className="rounded px-3 py-2.5 text-left text-sm font-medium text-zinc-400 transition hover:text-violet-400"
+                onClick={() => { setSettingsOpen(true); setMobileNavOpen(false); }}
+                className="flex items-center gap-2.5 rounded px-3 py-2.5 text-left text-sm font-medium text-zinc-400 transition hover:text-zinc-100"
               >
-                AI Insights
+                <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5 shrink-0 text-zinc-500">
+                  <path d="M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" stroke="currentColor" strokeWidth="1.3"/>
+                  <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.4 3.4l.7.7M11.9 11.9l.7.7M3.4 12.6l.7-.7M11.9 4.1l.7-.7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                </svg>
+                Settings
               </button>
             )}
             {agent?.role === 'admin' && (
               <button
-                onClick={() => { setSettingsOpen(true); setMobileNavOpen(false); }}
-                className="rounded border border-zinc-800 px-3 py-2.5 text-left text-sm font-medium text-zinc-500 transition hover:text-zinc-300"
+                onClick={() => { setInsightsOpen(true); setMobileNavOpen(false); }}
+                className="flex items-center gap-2.5 rounded px-3 py-2.5 text-left text-sm font-medium text-zinc-400 transition hover:text-violet-400"
               >
-                <span className="block text-[9px] uppercase tracking-widest text-zinc-600">Platform-wide</span>
-                Store Configuration
+                <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5 shrink-0">
+                  <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                </svg>
+                AI Insights
               </button>
             )}
             <Link
