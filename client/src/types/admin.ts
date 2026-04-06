@@ -116,6 +116,7 @@ export interface AdminProduct {
   sku: string;
   description: string;
   imageUrl?: string | null;
+  slug?: string | null;
 }
 
 export type CustomerArchetype = 'early_adopter' | 'loyal_advocate' | 'price_sensitive' | 'casual_buyer' | 'frustrated_veteran';
@@ -246,6 +247,7 @@ export interface AgentMessageProductRef {
   productId: string;
   name:      string;
   imageUrl?: string | null;
+  slug?:     string | null;
 }
 
 export interface AgentMessage {

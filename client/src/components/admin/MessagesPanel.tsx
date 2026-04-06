@@ -63,21 +63,64 @@ const STATUS_COLORS: Record<string, string> = {
 
 // ── Ref Picker ────────────────────────────────────────────────────────────────
 
+type TicketViewMode = 'assigned' | 'status';
+
+function TicketGroup({ label, tickets, selected, onAdd, onClose, showAssignee }: {
+  label: string;
+  tickets: AdminTicketSummary[];
+  selected: string[];
+  onAdd: (ref: AgentMessageTicketRef) => void;
+  onClose: () => void;
+  showAssignee?: boolean;
+}) {
+  if (tickets.length === 0) return null;
+  return (
+    <>
+      <li className="sticky top-0 bg-zinc-900 px-3 py-1 text-[9px] font-semibold uppercase tracking-widest text-zinc-600 border-b border-zinc-800/60">
+        {label}
+      </li>
+      {tickets.map((t) => (
+        <li key={t._id}>
+          <button
+            onMouseDown={() => { onAdd({ ticketId: t._id, title: t.title, status: t.status }); onClose(); }}
+            className="w-full flex items-start gap-2 px-3 py-2 text-left hover:bg-zinc-800 transition"
+          >
+            <span className={`mt-0.5 shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase whitespace-nowrap ${STATUS_COLORS[t.status] ?? 'bg-zinc-700 text-zinc-400'}`}>
+              {t.status.replace('_', ' ')}
+            </span>
+            <span className="flex-1 text-xs text-zinc-300 line-clamp-1">{t.title}</span>
+            {showAssignee && t.assignedTo && (
+              <span className="shrink-0 text-[10px] text-zinc-600 whitespace-nowrap">{t.assignedTo.name}</span>
+            )}
+          </button>
+        </li>
+      ))}
+    </>
+  );
+}
+
 function TicketPicker({
   selected,
   onAdd,
   onClose,
+  myId,
+  partnerId,
+  partnerName,
 }: {
-  selected: string[];
-  onAdd: (ref: AgentMessageTicketRef) => void;
-  onClose: () => void;
+  selected:    string[];
+  onAdd:       (ref: AgentMessageTicketRef) => void;
+  onClose:     () => void;
+  myId:        string;
+  partnerId:   string;
+  partnerName: string;
 }) {
-  const [tickets, setTickets] = useState<AdminTicketSummary[]>([]);
-  const [query, setQuery] = useState('');
+  const [tickets, setTickets]   = useState<AdminTicketSummary[]>([]);
+  const [query, setQuery]       = useState('');
+  const [view, setView]         = useState<TicketViewMode>('assigned');
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    adminApi.tickets.list({ limit: 50 }).then((r) => setTickets(r.data)).catch(() => null);
+    adminApi.tickets.list({ limit: 100 }).then((r) => setTickets(r.data)).catch(() => null);
   }, []);
 
   useEffect(() => {
@@ -88,41 +131,87 @@ function TicketPicker({
     return () => document.removeEventListener('mousedown', onDown);
   }, [onClose]);
 
-  const filtered = tickets.filter(
-    (t) => !selected.includes(t._id) && t.title.toLowerCase().includes(query.toLowerCase()),
+  const q = query.toLowerCase();
+  const available = tickets.filter(
+    (t) => !selected.includes(t._id) && (!q || t.title.toLowerCase().includes(q)),
   );
+
+  // ── Assigned view ──────────────────────────────────────────────────────────
+  const mine    = available.filter((t) => t.assignedTo?._id === myId);
+  const partner = available.filter((t) => t.assignedTo?._id === partnerId);
+  const others  = available.filter((t) => t.assignedTo?._id !== myId && t.assignedTo?._id !== partnerId);
+
+  // ── Status view ────────────────────────────────────────────────────────────
+  const byStatus: Record<string, AdminTicketSummary[]> = {};
+  for (const t of available) {
+    (byStatus[t.status] ??= []).push(t);
+  }
+  const statusOrder = ['new', 'in_progress', 'resolved'];
+  const statusLabel: Record<string, string> = { new: 'New', in_progress: 'In Progress', resolved: 'Resolved' };
+
+  const isEmpty = available.length === 0;
 
   return (
     <div ref={ref} className="absolute bottom-full mb-2 left-0 right-0 z-10 rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl overflow-hidden">
-      <div className="p-2 border-b border-zinc-800">
+      {/* Search + toggle */}
+      <div className="p-2 border-b border-zinc-800 flex items-center gap-2">
         <input
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search tickets…"
-          className="w-full rounded-lg bg-zinc-800 px-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-600 outline-none"
+          className="flex-1 rounded-lg bg-zinc-800 px-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-600 outline-none"
         />
+        <div className="flex rounded-lg border border-zinc-700 overflow-hidden shrink-0">
+          <button
+            onMouseDown={(e) => { e.preventDefault(); setView('assigned'); }}
+            className={`px-2 py-1 text-[10px] font-semibold transition ${view === 'assigned' ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+            title="Group by assignee"
+          >
+            <svg viewBox="0 0 12 12" fill="none" className="h-3 w-3">
+              <circle cx="6" cy="3.5" r="2" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M2 10c0-2.21 1.79-4 4-4s4 1.79 4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+          </button>
+          <button
+            onMouseDown={(e) => { e.preventDefault(); setView('status'); }}
+            className={`px-2 py-1 text-[10px] font-semibold transition border-l border-zinc-700 ${view === 'status' ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+            title="Group by status"
+          >
+            <svg viewBox="0 0 12 12" fill="none" className="h-3 w-3">
+              <rect x="1" y="1" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M3.5 5h5M3.5 7h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
       </div>
-      <ul className="max-h-52 overflow-y-auto">
-        {filtered.length === 0 && (
+
+      <ul className="max-h-56 overflow-y-auto">
+        {isEmpty && (
           <li className="px-3 py-4 text-center text-xs text-zinc-600">No tickets found</li>
         )}
-        {filtered.map((t) => (
-          <li key={t._id}>
-            <button
-              onMouseDown={() => {
-                onAdd({ ticketId: t._id, title: t.title, status: t.status });
-                onClose();
-              }}
-              className="w-full flex items-start gap-2 px-3 py-2 text-left hover:bg-zinc-800 transition"
-            >
-              <span className={`mt-0.5 shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase ${STATUS_COLORS[t.status] ?? 'bg-zinc-700 text-zinc-400'}`}>
-                {t.status.replace('_', ' ')}
-              </span>
-              <span className="text-xs text-zinc-300 line-clamp-1">{t.title}</span>
-            </button>
-          </li>
-        ))}
+
+        {!isEmpty && view === 'assigned' && (
+          <>
+            <TicketGroup label="My Tickets"              tickets={mine}    selected={selected} onAdd={onAdd} onClose={onClose} />
+            <TicketGroup label={`${partnerName}'s Tickets`} tickets={partner} selected={selected} onAdd={onAdd} onClose={onClose} />
+            <TicketGroup label="Others"                  tickets={others}  selected={selected} onAdd={onAdd} onClose={onClose} showAssignee />
+          </>
+        )}
+
+        {!isEmpty && view === 'status' && statusOrder.map((s) =>
+          byStatus[s]?.length ? (
+            <TicketGroup
+              key={s}
+              label={statusLabel[s] ?? s}
+              tickets={byStatus[s]}
+              selected={selected}
+              onAdd={onAdd}
+              onClose={onClose}
+              showAssignee
+            />
+          ) : null,
+        )}
       </ul>
     </div>
   );
@@ -176,7 +265,7 @@ function ProductPicker({
           <li key={p._id}>
             <button
               onMouseDown={() => {
-                onAdd({ productId: p._id, name: p.name, imageUrl: null });
+                onAdd({ productId: p._id, name: p.name, imageUrl: null, slug: p.slug ?? null });
                 onClose();
               }}
               className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-zinc-800 transition"
@@ -230,18 +319,22 @@ function MessageBubble({ msg, isMine }: { msg: AgentMessage; isMine: boolean }) 
 
         {/* Product refs */}
         {msg.productRefs.length > 0 && (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-col gap-1 w-full">
             {msg.productRefs.map((r) => (
-              <span
+              <Link
                 key={r.productId}
-                className="flex items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-400"
+                to={r.slug ? `/products?product=${r.slug}` : '/products'}
+                className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-1.5 transition hover:border-amber-500/40 hover:bg-amber-500/10"
               >
-                <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5 shrink-0">
+                <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3 shrink-0 text-amber-500/60">
                   <path d="M13 5H3L2 13h12L13 5z" stroke="currentColor" strokeWidth="1.3"/>
                   <path d="M5 5V4a3 3 0 016 0v1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
                 </svg>
-                {r.name}
-              </span>
+                <span className="text-[11px] text-amber-400 line-clamp-1 flex-1">{r.name}</span>
+                <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5 shrink-0 text-amber-500/40">
+                  <path d="M2 6h8M7 3l3 3-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </Link>
             ))}
           </div>
         )}
@@ -257,9 +350,15 @@ function MessageBubble({ msg, isMine }: { msg: AgentMessage; isMine: boolean }) 
 function Compose({
   onSend,
   disabled,
+  myId,
+  partnerId,
+  partnerName,
 }: {
   onSend: (body: string, ticketRefs: AgentMessageTicketRef[], productRefs: AgentMessageProductRef[]) => Promise<void>;
   disabled?: boolean;
+  myId:        string;
+  partnerId:   string;
+  partnerName: string;
 }) {
   const [body, setBody] = useState('');
   const [ticketRefs, setTicketRefs]   = useState<AgentMessageTicketRef[]>([]);
@@ -379,6 +478,9 @@ function Compose({
             selected={ticketRefs.map((r) => r.ticketId)}
             onAdd={(r) => setTicketRefs((p) => [...p, r])}
             onClose={() => setPicker(null)}
+            myId={myId}
+            partnerId={partnerId}
+            partnerName={partnerName}
           />
         )}
         {picker === 'product' && (
@@ -487,7 +589,7 @@ function ThreadView({
         <div ref={bottomRef} />
       </div>
 
-      <Compose onSend={handleSend} />
+      <Compose onSend={handleSend} myId={myId} partnerId={partner._id} partnerName={partner.name} />
     </div>
   );
 }

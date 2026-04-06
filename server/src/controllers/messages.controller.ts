@@ -98,7 +98,7 @@ export async function getConversation(req: Request, res: Response) {
         toId:        String(m.toId),
         body:        m.body,
         ticketRefs:  m.ticketRefs.map((r) => ({ ...r, ticketId: String(r.ticketId) })),
-        productRefs: m.productRefs.map((r) => ({ ...r, productId: String(r.productId) })),
+        productRefs: m.productRefs.map((r) => ({ ...r, productId: String(r.productId), slug: r.slug ?? null })),
         readAt:      m.readAt ?? null,
         createdAt:   m.createdAt,
       })),
@@ -113,7 +113,7 @@ export async function sendMessage(req: Request, res: Response) {
     toId:        string;
     body:        string;
     ticketRefs:  { ticketId: string; title: string; status: string }[];
-    productRefs: { productId: string; name: string; imageUrl?: string | null }[];
+    productRefs: { productId: string; name: string; imageUrl?: string | null; slug?: string | null }[];
   };
 
   if (!toId || !body?.trim()) {
@@ -139,6 +139,7 @@ export async function sendMessage(req: Request, res: Response) {
       productId: new Types.ObjectId(r.productId),
       name:      r.name,
       imageUrl:  r.imageUrl ?? null,
+      slug:      r.slug ?? null,
     })),
   });
 
