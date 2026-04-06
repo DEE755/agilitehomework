@@ -2,8 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi, getStoredAgent } from '../../services/adminApi';
 import { useToast } from '../../components/Toast';
-import type { Agent, AgentActivity } from '../../types/admin';
+import type { Agent, AgentActivity, AgentRating } from '../../types/admin';
 import StatusBadge from '../../components/StatusBadge';
+import MessagesPanel from '../../components/admin/MessagesPanel';
 
 const inputCls = 'w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-olive-500/60 focus:ring-1 focus:ring-olive-500/30';
 
@@ -57,19 +58,58 @@ export default function AdminAgentsPage() {
   const [formOpen, setFormOpen] = useState(false);
 
   // Activity panel
-  const [activityAgent, setActivityAgent] = useState<AgentActivity | null>(null);
+  const [activityAgent,   setActivityAgent]   = useState<AgentActivity | null>(null);
   const [activityLoading, setActivityLoading] = useState(false);
+
+  // Rating
+  const [aiRating,      setAiRating]      = useState<AgentRating | null>(null);
+  const [aiRating_busy, setAiRating_busy] = useState(false);
+  const [manualStars,   setManualStars]   = useState<number>(0);
+  const [savingManual,  setSavingManual]  = useState(false);
+  const [hoverStar,     setHoverStar]     = useState<number>(0);
 
   async function openActivity(id: string) {
     setActivityLoading(true);
     setActivityAgent(null);
+    setAiRating(null);
+    setManualStars(0);
     try {
       const res = await adminApi.getAgentActivity(id);
       setActivityAgent(res.data);
+      setAiRating(res.data.rating);
+      setManualStars(res.data.rating?.manualRating ?? 0);
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Failed to load activity', 'error');
     } finally {
       setActivityLoading(false);
+    }
+  }
+
+  async function handleAiRate() {
+    if (!activityAgent) return;
+    setAiRating_busy(true);
+    try {
+      const res = await adminApi.aiRateAgent(activityAgent.agent._id);
+      setAiRating(res.data);
+      toast('AI rating generated', 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Rating failed', 'error');
+    } finally {
+      setAiRating_busy(false);
+    }
+  }
+
+  async function handleSaveManualRating() {
+    if (!activityAgent || manualStars < 1) return;
+    setSavingManual(true);
+    try {
+      await adminApi.updateAgentRating(activityAgent.agent._id, manualStars);
+      setAiRating((prev) => prev ? { ...prev, manualRating: manualStars } : prev);
+      toast('Rating saved', 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to save rating', 'error');
+    } finally {
+      setSavingManual(false);
     }
   }
 
@@ -79,6 +119,9 @@ export default function AdminAgentsPage() {
   // Delete confirm
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Direct message
+  const [msgTarget, setMsgTarget] = useState<{ _id: string; name: string; avatarUrl?: string | null } | null>(null);
 
   const fetchAgents = useCallback(async () => {
     setLoading(true);
@@ -234,45 +277,60 @@ export default function AdminAgentsPage() {
                           )}
                         </td>
                         <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                          {isAdmin && !isAi && !isSelf && (
-                            <div className="flex items-center justify-end gap-2">
+                          <div className="flex flex-col items-end gap-1.5">
+                            {/* Message button — non-self, non-AI */}
+                            {!isAi && !isSelf && (
                               <button
-                                onClick={() => void handleResend(agent._id)}
-                                disabled={resending === agent._id}
-                                className="rounded border border-zinc-800 px-2.5 py-1 text-[10px] font-semibold text-zinc-600 transition hover:border-sky-500/30 hover:text-sky-400 disabled:opacity-40"
-                              >
-                                {resending === agent._id ? '…' : 'Resend invite'}
-                              </button>
-                            {confirmDelete === agent._id ? (
-                              <div className="flex items-center justify-end gap-2">
-                                <span className="text-xs text-zinc-500">Remove?</span>
-                                <button
-                                  onClick={() => void handleDelete(agent._id)}
-                                  disabled={deleting}
-                                  className="rounded border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[10px] font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-40"
-                                >
-                                  {deleting ? '…' : 'Confirm'}
-                                </button>
-                                <button
-                                  onClick={() => setConfirmDelete(null)}
-                                  className="rounded border border-zinc-700 px-2.5 py-1 text-[10px] font-semibold text-zinc-500 transition hover:text-zinc-300"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => setConfirmDelete(agent._id)}
-                                className="rounded border border-zinc-800 p-1.5 text-zinc-600 transition hover:border-red-500/30 hover:text-red-400"
-                                title="Remove agent"
+                                onClick={() => setMsgTarget({ _id: agent._id, name: agent.name, avatarUrl: agent.avatarUrl })}
+                                className="rounded border border-zinc-800 p-1.5 text-zinc-600 transition hover:border-sky-500/30 hover:text-sky-400"
+                                title={`Message ${agent.name}`}
                               >
                                 <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
-                                  <path d="M2 4h12M5 4V2.5A.5.5 0 015.5 2h5a.5.5 0 01.5.5V4M6 7v5M10 7v5M3 4l1 9.5A.5.5 0 004.5 14h7a.5.5 0 00.5-.5L13 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  <path d="M14 8.5c0 3-2.686 5.5-6 5.5a6.16 6.16 0 01-2.917-.726L2 14l.726-3.083A5.285 5.285 0 012 8.5C2 5.5 4.686 3 8 3s6 2.5 6 5.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
                                 </svg>
                               </button>
                             )}
-                            </div>
-                          )}
+                            {/* Admin actions */}
+                            {isAdmin && !isAi && !isSelf && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => void handleResend(agent._id)}
+                                  disabled={resending === agent._id}
+                                  className="rounded border border-zinc-800 px-2.5 py-1 text-[10px] font-semibold text-zinc-600 transition hover:border-sky-500/30 hover:text-sky-400 disabled:opacity-40"
+                                >
+                                  {resending === agent._id ? '…' : 'Resend invite'}
+                                </button>
+                                {confirmDelete === agent._id ? (
+                                  <>
+                                    <span className="text-xs text-zinc-500">Remove?</span>
+                                    <button
+                                      onClick={() => void handleDelete(agent._id)}
+                                      disabled={deleting}
+                                      className="rounded border border-red-500/30 bg-red-500/10 px-2.5 py-1 text-[10px] font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-40"
+                                    >
+                                      {deleting ? '…' : 'Confirm'}
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmDelete(null)}
+                                      className="rounded border border-zinc-700 px-2.5 py-1 text-[10px] font-semibold text-zinc-500 transition hover:text-zinc-300"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    onClick={() => setConfirmDelete(agent._id)}
+                                    className="rounded border border-zinc-800 p-1.5 text-zinc-600 transition hover:border-red-500/30 hover:text-red-400"
+                                    title="Remove agent"
+                                  >
+                                    <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
+                                      <path d="M2 4h12M5 4V2.5A.5.5 0 015.5 2h5a.5.5 0 01.5.5V4M6 7v5M10 7v5M3 4l1 9.5A.5.5 0 004.5 14h7a.5.5 0 00.5-.5L13 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -362,50 +420,216 @@ export default function AdminAgentsPage() {
         )}
       </div>
 
+      {/* Direct message panel */}
+      <MessagesPanel
+        open={!!msgTarget}
+        onClose={() => setMsgTarget(null)}
+        initialPartner={msgTarget ?? undefined}
+      />
+
       {/* Activity slide-over */}
       {(activityLoading || activityAgent) && (
         <>
           <div
-            className="fixed inset-0 z-20 bg-black/50"
+            className="fixed inset-0 z-20 bg-black/50 backdrop-blur-sm"
             onClick={() => { setActivityAgent(null); setActivityLoading(false); }}
           />
-          <div className="fixed inset-y-0 right-0 z-30 flex w-full max-w-md flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
-              <p className="text-sm font-semibold text-zinc-200">
-                {activityAgent ? activityAgent.agent.name : 'Loading…'}
-              </p>
+          <div className="fixed inset-y-0 right-0 z-30 flex w-full max-w-lg flex-col border-l border-zinc-800 bg-zinc-950 shadow-2xl">
+
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4 shrink-0">
+              <div className="flex items-center gap-3">
+                {activityAgent?.agent.avatarUrl ? (
+                  <img src={activityAgent.agent.avatarUrl} alt="" className="h-8 w-8 rounded-full object-cover border border-zinc-700" />
+                ) : (
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800 text-xs font-bold text-zinc-300">
+                    {activityAgent?.agent.name[0]?.toUpperCase() ?? '…'}
+                  </span>
+                )}
+                <div>
+                  <p className="text-sm font-semibold text-zinc-100">{activityAgent?.agent.name ?? 'Loading…'}</p>
+                  <p className="text-[10px] text-zinc-600">{activityAgent?.agent.email}</p>
+                </div>
+              </div>
               <button
                 onClick={() => { setActivityAgent(null); setActivityLoading(false); }}
                 className="text-zinc-600 transition hover:text-zinc-300"
               >
-                ✕
+                <svg viewBox="0 0 16 16" fill="none" className="h-4 w-4">
+                  <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
               </button>
             </div>
 
             {activityLoading && (
               <div className="flex flex-1 items-center justify-center">
-                <span className="text-sm text-zinc-600">Loading activity…</span>
+                <svg className="h-6 w-6 animate-spin text-zinc-600" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31" strokeDashoffset="10"/>
+                </svg>
               </div>
             )}
 
             {activityAgent && (
-              <div className="flex-1 overflow-y-auto p-5 space-y-6">
-                {/* Stats */}
-                <div className="grid grid-cols-4 gap-3">
+              <div className="flex-1 overflow-y-auto p-5 space-y-7">
+
+                {/* ── Stats row ───────────────────────────────────────────── */}
+                <div className="grid grid-cols-4 gap-2.5">
                   {[
                     { label: 'Assigned', value: activityAgent.stats.assigned },
                     { label: 'Resolved', value: activityAgent.stats.resolved },
                     { label: 'Replies',  value: activityAgent.stats.replies  },
                     { label: 'Notes',    value: activityAgent.stats.notes    },
                   ].map((s) => (
-                    <div key={s.label} className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-3 text-center">
-                      <p className="text-lg font-bold text-zinc-100">{s.value}</p>
+                    <div key={s.label} className="rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-3 text-center">
+                      <p className="text-xl font-bold text-zinc-100">{s.value}</p>
                       <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-600">{s.label}</p>
                     </div>
                   ))}
                 </div>
 
-                {/* Assigned tickets */}
+                {/* ── AI Performance Rating ───────────────────────────────── */}
+                {isAdmin && !activityAgent.agent.isAiAgent && (
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden">
+                    {/* Section header */}
+                    <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5 text-violet-400">
+                          <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                        </svg>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">Performance Rating</p>
+                      </div>
+                      <button
+                        onClick={() => void handleAiRate()}
+                        disabled={aiRating_busy}
+                        className="flex items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-3 py-1 text-[11px] font-semibold text-violet-400 transition hover:bg-violet-500/20 disabled:opacity-50"
+                      >
+                        {aiRating_busy ? (
+                          <>
+                            <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="31" strokeDashoffset="10"/>
+                            </svg>
+                            Analyzing…
+                          </>
+                        ) : (
+                          <>
+                            <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5">
+                              <path d="M6 1l1 3h3l-2.5 2 1 3L6 7.5 3.5 9l1-3L2 4h3z" stroke="currentColor" strokeWidth="1" strokeLinejoin="round"/>
+                            </svg>
+                            {aiRating?.aiRating ? 'Re-rate with AI' : 'Rate with AI'}
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="p-4 space-y-4">
+                      {/* AI star score */}
+                      {aiRating?.aiRating ? (
+                        <>
+                          <div className="flex items-center gap-3">
+                            <div className="flex gap-0.5">
+                              {[1,2,3,4,5].map((n) => (
+                                <svg key={n} viewBox="0 0 16 16" className={`h-5 w-5 ${n <= (aiRating.aiRating ?? 0) ? 'text-amber-400' : 'text-zinc-700'}`}>
+                                  <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" fill="currentColor"/>
+                                </svg>
+                              ))}
+                            </div>
+                            <span className="text-2xl font-bold text-zinc-100">{aiRating.aiRating}<span className="text-sm font-normal text-zinc-500">/5</span></span>
+                            {aiRating.aiRatedAt && (
+                              <span className="ml-auto text-[10px] text-zinc-600">
+                                {new Date(aiRating.aiRatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </span>
+                            )}
+                          </div>
+
+                          {aiRating.aiRatingExplanation && (
+                            <p className="text-xs text-zinc-400 leading-relaxed border-l-2 border-violet-500/30 pl-3">
+                              {aiRating.aiRatingExplanation}
+                            </p>
+                          )}
+
+                          <div className="grid grid-cols-2 gap-3">
+                            {aiRating.aiRatingStrengths?.length > 0 && (
+                              <div>
+                                <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-600">
+                                  <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  Strengths
+                                </p>
+                                <ul className="space-y-1">
+                                  {aiRating.aiRatingStrengths.map((s, i) => (
+                                    <li key={i} className="flex gap-1.5 text-[11px] text-zinc-400">
+                                      <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-emerald-500/60" />
+                                      {s}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {aiRating.aiRatingImprovements?.length > 0 && (
+                              <div>
+                                <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-amber-600">
+                                  <svg viewBox="0 0 12 12" fill="none" className="h-2.5 w-2.5"><path d="M6 2v4M6 8v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                                  To improve
+                                </p>
+                                <ul className="space-y-1">
+                                  {aiRating.aiRatingImprovements.map((s, i) => (
+                                    <li key={i} className="flex gap-1.5 text-[11px] text-zinc-400">
+                                      <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-amber-500/60" />
+                                      {s}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-xs text-zinc-600 py-2">
+                          No AI assessment yet — click "Rate with AI" to generate one based on this agent's ticket history and replies.
+                        </p>
+                      )}
+
+                      {/* Overall rating */}
+                      <div className="border-t border-zinc-800 pt-4">
+                        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Overall Rating</p>
+                        <div className="flex items-center gap-3">
+                          <div className="flex gap-0.5">
+                            {[1,2,3,4,5].map((n) => (
+                              <button
+                                key={n}
+                                onMouseEnter={() => setHoverStar(n)}
+                                onMouseLeave={() => setHoverStar(0)}
+                                onClick={() => setManualStars(n)}
+                                className="transition"
+                              >
+                                <svg viewBox="0 0 16 16" className={`h-5 w-5 transition ${
+                                  n <= (hoverStar || manualStars)
+                                    ? 'text-amber-400'
+                                    : 'text-zinc-700 hover:text-zinc-500'
+                                }`}>
+                                  <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" fill="currentColor"/>
+                                </svg>
+                              </button>
+                            ))}
+                          </div>
+                          {manualStars > 0 && (
+                            <button
+                              onClick={() => void handleSaveManualRating()}
+                              disabled={savingManual}
+                              className="rounded-full border border-zinc-700 px-3 py-1 text-[11px] font-semibold text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-200 disabled:opacity-40"
+                            >
+                              {savingManual ? 'Saving…' : 'Save'}
+                            </button>
+                          )}
+                          {aiRating?.manualRating && manualStars === aiRating.manualRating && (
+                            <span className="text-[10px] text-zinc-600">Saved</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Assigned Tickets ────────────────────────────────────── */}
                 <div>
                   <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Assigned Tickets</p>
                   {activityAgent.assignedTickets.length === 0 ? (
@@ -427,7 +651,7 @@ export default function AdminAgentsPage() {
                   )}
                 </div>
 
-                {/* Recent replies */}
+                {/* ── Recent Replies ──────────────────────────────────────── */}
                 <div>
                   <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Recent Replies</p>
                   {activityAgent.recentReplies.length === 0 ? (
@@ -443,6 +667,7 @@ export default function AdminAgentsPage() {
                     </div>
                   )}
                 </div>
+
               </div>
             )}
           </div>

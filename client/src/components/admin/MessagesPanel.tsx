@@ -13,6 +13,22 @@ import type {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const ONLINE_MS = 10 * 60 * 1000;
+function isOnline(lastActiveAt?: string | null) {
+  if (!lastActiveAt) return false;
+  return Date.now() - new Date(lastActiveAt).getTime() < ONLINE_MS;
+}
+
+function OnlineDot({ active }: { active: boolean }) {
+  if (!active) return null;
+  return (
+    <span className="relative flex h-2 w-2 shrink-0">
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-60" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+    </span>
+  );
+}
+
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
@@ -383,10 +399,12 @@ function ThreadView({
   partner,
   myId,
   onSend,
+  partnerOnline,
 }: {
   partner: { _id: string; name: string; avatarUrl?: string | null };
   myId: string;
   onSend: (body: string, ticketRefs: AgentMessageTicketRef[], productRefs: AgentMessageProductRef[]) => Promise<void>;
+  partnerOnline?: boolean;
 }) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -427,8 +445,20 @@ function ThreadView({
     <div className="flex flex-col h-full">
       {/* Thread header */}
       <div className="flex items-center gap-2.5 border-b border-zinc-800 px-4 py-3 shrink-0">
-        <Avatar name={partner.name} url={partner.avatarUrl} />
-        <span className="font-semibold text-sm text-zinc-100">{partner.name}</span>
+        <div className="relative">
+          <Avatar name={partner.name} url={partner.avatarUrl} />
+          {partnerOnline && (
+            <span className="absolute -bottom-0.5 -right-0.5">
+              <OnlineDot active />
+            </span>
+          )}
+        </div>
+        <div>
+          <span className="font-semibold text-sm text-zinc-100">{partner.name}</span>
+          {partnerOnline && (
+            <p className="text-[10px] text-green-500 font-semibold">Connected</p>
+          )}
+        </div>
       </div>
 
       {/* Messages */}
@@ -468,12 +498,12 @@ function ConversationList({
   conversations,
   activeId,
   onSelect,
-  myId,
+  onlineIds,
 }: {
   conversations: AgentConversation[];
   activeId: string | null;
   onSelect: (agentId: string, agentName: string, agentAvatar: string | null) => void;
-  myId: string;
+  onlineIds: Set<string>;
 }) {
   return (
     <ul className="flex flex-col divide-y divide-zinc-800/60">
@@ -487,6 +517,11 @@ function ConversationList({
           >
             <div className="relative shrink-0">
               <Avatar name={c.agentName} url={c.agentAvatar} />
+              {onlineIds.has(c.agentId) && !c.unreadCount && (
+                <span className="absolute -bottom-0.5 -right-0.5">
+                  <OnlineDot active />
+                </span>
+              )}
               {c.unreadCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-sky-500 text-[8px] font-bold text-white">
                   {c.unreadCount > 9 ? '9+' : c.unreadCount}
@@ -574,15 +609,18 @@ interface MessagesPanelProps {
   open: boolean;
   onClose: () => void;
   onUnreadChange?: (count: number) => void;
+  initialPartner?: { _id: string; name: string; avatarUrl?: string | null };
 }
 
-export default function MessagesPanel({ open, onClose, onUnreadChange }: MessagesPanelProps) {
+export default function MessagesPanel({ open, onClose, onUnreadChange, initialPartner }: MessagesPanelProps) {
   const me = getStoredAgent();
   const myId = me?._id ?? '';
 
   const [conversations, setConversations] = useState<AgentConversation[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [activePartner, setActivePartner] = useState<{ _id: string; name: string; avatarUrl: string | null } | null>(null);
+  const [activePartner, setActivePartner] = useState<{ _id: string; name: string; avatarUrl: string | null } | null>(
+    initialPartner ? { _id: initialPartner._id, name: initialPartner.name, avatarUrl: initialPartner.avatarUrl ?? null } : null,
+  );
   const [showPicker, setShowPicker] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -598,6 +636,12 @@ export default function MessagesPanel({ open, onClose, onUnreadChange }: Message
       /* ignore */
     }
   }, [onUnreadChange]);
+
+  useEffect(() => {
+    if (initialPartner) {
+      setActivePartner({ _id: initialPartner._id, name: initialPartner.name, avatarUrl: initialPartner.avatarUrl ?? null });
+    }
+  }, [initialPartner?._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) return;
@@ -706,7 +750,7 @@ export default function MessagesPanel({ open, onClose, onUnreadChange }: Message
                 conversations={conversations}
                 activeId={activePartner?._id ?? null}
                 onSelect={selectConversation}
-                myId={myId}
+                onlineIds={new Set(agents.filter((a) => isOnline(a.lastActiveAt)).map((a) => a._id))}
               />
             )}
           </div>
@@ -725,6 +769,7 @@ export default function MessagesPanel({ open, onClose, onUnreadChange }: Message
                 partner={activePartner}
                 myId={myId}
                 onSend={handleSend}
+                partnerOnline={isOnline(agents.find((a) => a._id === activePartner._id)?.lastActiveAt)}
               />
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center p-8">

@@ -294,8 +294,6 @@ export default function InsightsPanel({ open, onClose }: Props) {
     }
   }
 
-  // The insights data to display (current or historical)
-  const displayInsights = tab === 'history' && selectedSnap ? selectedSnap.data : insights;
   const displayDate     = tab === 'history' && selectedSnap
     ? new Date(selectedSnap.generatedAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
     : generatedAt;
