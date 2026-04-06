@@ -237,6 +237,7 @@ export const adminApi = {
       productTitle?: string;
       productCategory?: string;
       summary?: string;
+      agentDraft?: string;
     }): Promise<{ data: AiSuggestReplyResult }> {
       return aiReq('/suggest-reply', input);
     },

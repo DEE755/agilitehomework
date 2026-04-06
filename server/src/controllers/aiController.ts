@@ -57,12 +57,13 @@ export async function triageTicketHandler(req: Request, res: Response): Promise<
 
 // POST /api/ai/suggest-reply
 export async function suggestReplyHandler(req: Request, res: Response): Promise<void> {
-  const { subject, message, productTitle, productCategory, summary } = req.body as {
+  const { subject, message, productTitle, productCategory, summary, agentDraft } = req.body as {
     subject?: unknown;
     message?: unknown;
     productTitle?: unknown;
     productCategory?: unknown;
     summary?: unknown;
+    agentDraft?: unknown;
   };
 
   if (typeof subject !== 'string' || !subject.trim()) {
@@ -81,6 +82,7 @@ export async function suggestReplyHandler(req: Request, res: Response): Promise<
       productTitle:    typeof productTitle    === 'string' ? productTitle.trim()    : undefined,
       productCategory: typeof productCategory === 'string' ? productCategory.trim() : undefined,
       summary:         typeof summary         === 'string' ? summary.trim()         : undefined,
+      agentDraft:      typeof agentDraft      === 'string' ? agentDraft.trim()      : undefined,
     });
 
     res.json({ data: result });

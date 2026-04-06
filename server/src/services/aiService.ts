@@ -221,12 +221,16 @@ export async function suggestReply(input: {
   productTitle?: string;
   productCategory?: string;
   summary?: string;
+  agentDraft?: string;
 }): Promise<SuggestReplyResult> {
   const context = [
     `Subject: ${input.subject}`,
     input.productTitle ? `Product: ${input.productTitle}${input.productCategory ? ` (${input.productCategory})` : ''}` : null,
     input.summary ? `Issue summary: ${input.summary}` : null,
     `\nCustomer message:\n${input.message}`,
+    input.agentDraft
+      ? `\nThe agent has already written a draft reply. Improve it — make it clearer, more professional, and more complete while fully preserving the agent's intent and facts:\n\nAgent draft:\n${input.agentDraft}`
+      : null,
   ]
     .filter(Boolean)
     .join('\n');

@@ -1295,6 +1295,7 @@ export default function AdminTicketDetailPage() {
         productTitle:    ticket.product?.name,
         productCategory: ticket.product?.category,
         summary:         ticket.aiSummary ?? undefined,
+        agentDraft:      replyBody.trim() || undefined,
       });
       setSuggestResult(data);
       setReplyBody(data.suggestedReply);
@@ -1430,7 +1431,7 @@ export default function AdminTicketDetailPage() {
                   className="flex items-center gap-1.5 rounded border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-400 transition hover:bg-violet-500/20 disabled:opacity-40"
                 >
                   <span>{suggesting ? '⟳' : '✦'}</span>
-                  {suggesting ? 'Analysing…' : 'Suggest Reply'}
+                  {suggesting ? 'Analysing…' : replyBody.trim() ? 'Improve my answer' : 'Suggest Reply'}
                 </button>
               </div>
               <form onSubmit={(e) => void handleReply(e)}>
