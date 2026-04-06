@@ -46,7 +46,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_CLS: Record<string, string> = {
-  new:         'border-olive-500/30 bg-olive-500/10 text-olive-400',
+  new:         'th-btn border',
   in_progress: 'border-sky-500/30 bg-sky-500/10 text-sky-400',
   resolved:    'border-zinc-700 bg-zinc-800 text-zinc-400',
 };
@@ -58,7 +58,7 @@ function formatDate(iso: string) {
 }
 
 const inputCls =
-  'w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-olive-500/60 focus:ring-1 focus:ring-olive-500/30';
+  'w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:ring-1 focus:ring-[var(--th-border)] focus:border-[var(--th-border)]';
 
 export default function TicketLookupPage() {
   const [searchParams] = useSearchParams();
@@ -195,7 +195,7 @@ export default function TicketLookupPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full rounded-lg border border-olive-500/40 bg-olive-500/15 py-3 text-xs font-semibold uppercase tracking-wider text-olive-400 transition hover:bg-olive-500/25 disabled:opacity-50"
+                className="th-btn w-full rounded-lg border py-3 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-50"
               >
                 {loading ? 'Looking up…' : 'View My Ticket'}
               </button>
@@ -283,22 +283,23 @@ export default function TicketLookupPage() {
                 key={i}
                 className={`rounded-xl border p-5 ${
                   reply.isAgent
-                    ? 'border-olive-500/20 bg-olive-500/5'
+                    ? 'border-[var(--th-border)] bg-[var(--th-accent-dim)]'
                     : 'border-zinc-800 bg-zinc-900/60'
                 }`}
               >
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className={`flex h-7 w-7 items-center justify-center rounded-full border text-[10px] font-bold ${
-                      reply.isAgent
-                        ? 'border-olive-500/40 bg-olive-500/10 text-olive-400'
-                        : 'border-zinc-700 bg-zinc-800 text-zinc-300'
-                    }`}>
+                    <span
+                      className={`flex h-7 w-7 items-center justify-center rounded-full border text-[10px] font-bold ${
+                        reply.isAgent ? '' : 'border-zinc-700 bg-zinc-800 text-zinc-300'
+                      }`}
+                      style={reply.isAgent ? { borderColor: 'var(--th-border)', backgroundColor: 'var(--th-accent-dim)', color: 'var(--th-accent-text)' } : undefined}
+                    >
                       {reply.isAgent ? '★' : reply.authorName[0]?.toUpperCase()}
                     </span>
                     <span className="text-xs font-semibold text-zinc-300">{reply.authorName}</span>
                     {reply.isAgent && (
-                      <span className="rounded-full border border-olive-500/25 bg-olive-500/10 px-1.5 py-0.5 text-[9px] text-olive-500">
+                      <span className="th-btn rounded-full border px-1.5 py-0.5 text-[9px]">
                         Support Team
                       </span>
                     )}
@@ -339,7 +340,7 @@ export default function TicketLookupPage() {
                   <button
                     type="submit"
                     disabled={replySending || !replyBody.trim()}
-                    className="rounded-lg border border-olive-500/40 bg-olive-500/15 px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-olive-400 transition hover:bg-olive-500/25 disabled:opacity-40"
+                    className="th-btn rounded-lg border px-6 py-2.5 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-40"
                   >
                     {replySending ? 'Sending…' : 'Send Message'}
                   </button>
@@ -352,7 +353,7 @@ export default function TicketLookupPage() {
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               to="/support/new"
-              className="flex-1 rounded-lg border border-olive-500/40 bg-olive-500/15 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-olive-400 transition hover:bg-olive-500/25"
+              className="th-btn flex-1 rounded-lg border px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider transition"
             >
               Open a New Request
             </Link>

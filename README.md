@@ -17,8 +17,10 @@ A full-stack customer support platform built for a premium tactical gear brand. 
 9. [Security](#security)
 10. [MongoDB Atlas Setup](#mongodb-atlas-setup)
 11. [Render Deployment](#render-deployment)
-12. [API Reference](#api-reference)
-13. [Scripts](#scripts)
+12. [Docker](#docker)
+13. [Deploying on Other Platforms](#deploying-on-other-platforms)
+14. [API Reference](#api-reference)
+15. [Scripts](#scripts)
 
 ---
 
@@ -456,7 +458,63 @@ Paste as `MONGODB_URI` in `.env`. Mongoose creates collections automatically on 
 
 ## Render Deployment
 
-### API (Web Service)
+> **`render.yaml` is a [Render Blueprint](https://render.com/docs/blueprint-spec)** — it is specific to [Render](https://render.com) and will not work on other platforms as-is. If you deploy elsewhere, see [Deploying on Other Platforms](#deploying-on-other-platforms) below.
+
+### Blueprint (recommended) — one-click deploy
+
+The `render.yaml` at the repo root describes both services and all environment variable wiring. Render reads it automatically when you connect the repo.
+
+**Steps:**
+
+1. Push the repo to GitHub or GitLab (the file must be at the root).
+2. In the Render dashboard → **New** → **Blueprint** → select this repository.
+3. Render detects `render.yaml` and shows a preview of the two services it will create:
+   - `agilite-api` — Express API (Node web service)
+   - `agilite-client` — React SPA (static site)
+4. Fill in every variable marked **"sync: false"** before clicking **Apply**:
+
+| Variable | Where to find it |
+| -------- | ---------------- |
+| `MONGODB_URI` | MongoDB Atlas → Connect → Drivers |
+| `MAILGUN_DOMAIN` | Mailgun → Sending → Domains |
+| `MAILGUN_API_KEY` | Mailgun → Account → API Keys |
+| `MAILGUN_FROM_EMAIL` | Your verified sender address |
+| `S3_ENDPOINT` | Cloudflare R2 → Manage API Tokens |
+| `S3_ACCESS_KEY_ID` | Cloudflare R2 → Manage API Tokens |
+| `S3_SECRET_ACCESS_KEY` | Cloudflare R2 → Manage API Tokens |
+| `S3_PUBLIC_BASE_URL` | R2 bucket public URL (optional) |
+| `PYDANTIC_GATEWAY_BASE_URL` | Your AI gateway URL |
+| `PYDANTIC_GATEWAY_API_KEY` | Your AI gateway API key |
+| `LOGFIRE_TOKEN` | Logfire dashboard (optional, leave blank to disable) |
+
+5. Click **Apply**. Render deploys both services and automatically:
+   - Generates a secure `JWT_SECRET`
+   - Wires `VITE_API_URL` to point at the API's URL (appending `/api`) at build time
+   - Wires `CLIENT_URL` and `APP_URL` on the API to the static site's URL (for CORS and email links)
+
+**Inter-service URL wiring explained:**
+
+The client build needs the API's public URL so Vite can embed it at compile time. The `render.yaml` handles this via `fromService`:
+
+```yaml
+# client buildCommand:
+buildCommand: npm install && VITE_API_URL="${VITE_API_BASE_URL}/api" npm run build
+
+# VITE_API_BASE_URL is populated from the API service's RENDER_EXTERNAL_URL:
+- key: VITE_API_BASE_URL
+  fromService:
+    type: web
+    name: agilite-api
+    envVarKey: RENDER_EXTERNAL_URL
+```
+
+Render pre-assigns URLs by service name before deploying, so there is no chicken-and-egg problem.
+
+### Manual deployment (Render dashboard without Blueprint)
+
+If you prefer to configure services by hand in the Render dashboard:
+
+**API — Web Service**
 
 | Setting | Value |
 | ------- | ----- |
@@ -464,10 +522,11 @@ Paste as `MONGODB_URI` in `.env`. Mongoose creates collections automatically on 
 | Runtime | Node |
 | Build command | `npm install && npm run build` |
 | Start command | `npm start` |
+| Health check path | `/health` |
 
-Environment variables to set: `MONGODB_URI`, `JWT_SECRET`, `NODE_ENV=production`, and all AI / S3 / Mailgun vars.
+Set environment variables: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`, `CLIENT_URL` (frontend URL), `APP_URL` (frontend URL), and all Mailgun / R2 / AI Gateway vars.
 
-### Frontend (Static Site)
+**Frontend — Static Site**
 
 | Setting | Value |
 | ------- | ----- |
@@ -475,17 +534,165 @@ Environment variables to set: `MONGODB_URI`, `JWT_SECRET`, `NODE_ENV=production`
 | Build command | `npm install && npm run build` |
 | Publish directory | `dist` |
 
-Environment variable: `VITE_API_URL=https://your-api.onrender.com/api`
+Set `VITE_API_URL=https://your-api-name.onrender.com/api`.
 
-Add a rewrite rule for React Router: `/* → /index.html` (Rewrite).
+Add a rewrite rule: `/*` → `/index.html` (type: **Rewrite**) for React Router.
 
-### CORS in production
+---
 
-```ts
-app.use(cors({ origin: process.env.CLIENT_URL ?? '*' }));
+## Docker
+
+The repo includes Dockerfiles for both services and a `docker-compose.yml` for running the full stack locally in production mode. The setup is platform-agnostic — it runs on any machine with Docker installed and is the recommended way to test a production build before pushing to a host.
+
+### Files added
+
+| File | Purpose |
+| ---- | ------- |
+| `server/Dockerfile` | Two-stage build: compile TypeScript → minimal Node runtime image |
+| `client/Dockerfile` | Two-stage build: Vite bundle → nginx static server |
+| `client/nginx.conf` | SPA fallback (`try_files`), asset caching, security headers |
+| `docker-compose.yml` | Orchestrates both containers, wires env vars, health-checks the API before starting the client |
+
+### How it differs from `render.yaml`
+
+Both describe the same two services with the same build commands. The key difference is what each platform handles for you:
+
+| | `render.yaml` | Docker / Compose |
+| - | ------------- | ---------------- |
+| Serving static files | Render built-in | nginx in `client/Dockerfile` |
+| SPA routing | `routes:` block | `nginx.conf` `try_files` |
+| Cache headers | `headers:` block | `nginx.conf` `add_header` |
+| `VITE_API_URL` wiring | `fromService` (automatic) | `--build-arg` (manual) |
+| `JWT_SECRET` generation | `generateValue: true` | `openssl rand -hex 32` |
+| Inter-service networking | Render manages | Docker network (Compose) |
+
+### Quick start
+
+```bash
+# 1. Copy and fill in the root .env (same variables as the server .env.example)
+cp server/.env.example .env
+
+# 2. Build and start both containers
+docker compose up --build
+
+# 3. Seed the database (first run only — while containers are running)
+docker compose exec api node dist/scripts/seed-agent.js
 ```
 
-Add `CLIENT_URL=https://your-frontend.onrender.com` to the API service's environment.
+| URL | Service |
+| --- | ------- |
+| `http://localhost:3000` | Customer portal |
+| `http://localhost:3000/admin` | Agent workspace |
+| `http://localhost:5050` | API |
+| `http://localhost:5050/health` | API health check |
+
+### The `VITE_API_URL` build-arg caveat
+
+Vite embeds `VITE_API_URL` into the JavaScript bundle **at build time**. The docker-compose default is `http://localhost:5050/api`, which works because the API port is mapped to the host and the browser can reach it directly.
+
+For a remote server (VPS, Fly.io, etc.), you must pass the public API URL when building the client image:
+
+```bash
+# Option A — via docker compose (override in .env or inline)
+VITE_API_URL=https://api.yourdomain.com/api docker compose up --build
+
+# Option B — build the client image directly
+docker build \
+  --build-arg VITE_API_URL=https://api.yourdomain.com/api \
+  -t agilite-client \
+  ./client
+```
+
+If the URL changes (e.g. you move the API to a new host), you must rebuild the client image. This is an inherent property of Vite's static build — not specific to Docker.
+
+### Building images for production
+
+```bash
+# API image
+docker build -t agilite-api ./server
+
+# Client image (replace with your actual API URL)
+docker build \
+  --build-arg VITE_API_URL=https://api.yourdomain.com/api \
+  -t agilite-client \
+  ./client
+```
+
+Push to any container registry (Docker Hub, GHCR, ECR) and deploy to any host that runs Docker.
+
+---
+
+## Deploying on Other Platforms
+
+`render.yaml` is **Render-specific**. The concepts map to other platforms as follows:
+
+### What each service becomes
+
+| Service | Type | Equivalent on other platforms |
+| ------- | ---- | ----------------------------- |
+| `agilite-api` | Node web process | Railway service, Fly.io app, Heroku dyno, EC2/VPS |
+| `agilite-client` | Static site | Vercel, Netlify, Cloudflare Pages, S3 + CloudFront |
+
+### Platform-specific notes
+
+**Railway**
+
+Railway has its own `railway.toml` format. Create two services from the same repo, set `rootDirectory` to `server` and `client` respectively, and add the same environment variables manually. Railway does not auto-wire inter-service URLs — copy the API service's public URL and paste it as `VITE_API_URL` on the client service.
+
+**Vercel + Railway (common split)**
+
+Host the static site on Vercel (automatic Vite support, zero config) and the API on Railway. In Vercel set `VITE_API_URL` to your Railway API URL + `/api`. The SPA rewrite (`/*` → `/index.html`) is automatic on Vercel.
+
+**Fly.io**
+
+Each service needs its own `fly.toml`. The API deploys as a standard Node app (`fly launch` from `server/`). The static site can be served via an nginx Dockerfile (`fly launch` from `client/` after building). Secrets are set with `fly secrets set KEY=value`.
+
+**VPS / Docker**
+
+Build both services:
+
+```bash
+# API
+cd server && npm install && npm run build
+NODE_ENV=production node dist/index.js
+
+# Client — build once, serve statically
+cd client && npm install && VITE_API_URL=https://your-api/api npm run build
+# Serve dist/ with nginx, Caddy, or `npx serve`
+```
+
+Any static file server can host `client/dist/`. The only requirement is that it serves `index.html` for all routes that don't match a real file (SPA fallback).
+
+### Environment variables — platform-agnostic list
+
+Regardless of where you deploy, the API needs:
+
+```
+NODE_ENV=production
+MONGODB_URI=
+JWT_SECRET=                   # min 32 random bytes
+CLIENT_URL=                   # frontend origin, for CORS
+APP_URL=                      # frontend origin, for email links
+MAILGUN_API_KEY=
+MAILGUN_DOMAIN=
+MAILGUN_FROM_EMAIL=
+MAILGUN_BASE_URL=https://api.mailgun.net/v3
+S3_ENDPOINT=
+S3_REGION=auto
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+S3_PUBLIC_BASE_URL=           # optional
+PYDANTIC_GATEWAY_BASE_URL=
+PYDANTIC_GATEWAY_API_KEY=
+PYDANTIC_GATEWAY_MODEL=gpt-4o-mini
+LOGFIRE_TOKEN=                # optional
+```
+
+And the client build needs:
+
+```
+VITE_API_URL=https://your-api-host/api
+```
 
 ---
 

@@ -9,12 +9,18 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur-sm">
+    <header
+      className="sticky top-0 z-10 border-b bg-zinc-950/95 backdrop-blur-sm"
+      style={{ borderColor: 'var(--th-nav-border)' }}
+    >
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         {/* Brand */}
         <NavLink to="/products" className="flex items-center gap-3" onClick={() => setMobileOpen(false)}>
-          <span className="flex h-8 w-8 items-center justify-center rounded border border-olive-500/40 bg-olive-500/15">
-            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4 text-olive-400" xmlns="http://www.w3.org/2000/svg">
+          <span
+            className="flex h-8 w-8 items-center justify-center rounded border"
+            style={{ borderColor: 'var(--th-logo-border)', backgroundColor: 'var(--th-logo-bg)' }}
+          >
+            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" style={{ color: 'var(--th-accent-text)' }} xmlns="http://www.w3.org/2000/svg">
               <path d="M10 2L2 7v6l8 5 8-5V7L10 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
               <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" fill="currentColor"/>
             </svg>
@@ -34,7 +40,7 @@ export default function Navbar() {
               className={({ isActive }) =>
                 `rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition ${
                   isActive
-                    ? 'text-olive-400'
+                    ? 'th-text'
                     : 'text-zinc-500 hover:text-zinc-200'
                 }`
               }
@@ -47,7 +53,7 @@ export default function Navbar() {
             to="/support/lookup"
             className={({ isActive }) =>
               `rounded px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition ${
-                isActive ? 'text-olive-400' : 'text-zinc-500 hover:text-zinc-200'
+                isActive ? 'th-text' : 'text-zinc-500 hover:text-zinc-200'
               }`
             }
           >
@@ -56,7 +62,7 @@ export default function Navbar() {
 
           <NavLink
             to="/support/new"
-            className="ml-2 rounded border border-olive-500/40 bg-olive-500/15 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-olive-400 transition hover:bg-olive-500/25 hover:text-olive-300"
+            className="th-btn ml-2 rounded border px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider transition"
           >
             Open Ticket
           </NavLink>
@@ -92,7 +98,7 @@ export default function Navbar() {
                 onClick={() => setMobileOpen(false)}
                 className={({ isActive }) =>
                   `rounded px-3 py-2.5 text-sm font-medium transition ${
-                    isActive ? 'bg-zinc-900 text-olive-400' : 'text-zinc-400 hover:text-zinc-100'
+                    isActive ? 'bg-zinc-900 th-text' : 'text-zinc-400 hover:text-zinc-100'
                   }`
                 }
               >
@@ -104,7 +110,7 @@ export default function Navbar() {
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 `rounded px-3 py-2.5 text-sm font-medium transition ${
-                  isActive ? 'bg-zinc-900 text-olive-400' : 'text-zinc-400 hover:text-zinc-100'
+                  isActive ? 'bg-zinc-900 th-text' : 'text-zinc-400 hover:text-zinc-100'
                 }`
               }
             >
@@ -113,7 +119,7 @@ export default function Navbar() {
             <NavLink
               to="/support/new"
               onClick={() => setMobileOpen(false)}
-              className="mt-1 rounded border border-olive-500/40 bg-olive-500/15 px-3 py-2.5 text-center text-sm font-semibold text-olive-400"
+              className="th-btn mt-1 rounded border px-3 py-2.5 text-center text-sm font-semibold"
             >
               Open Ticket
             </NavLink>

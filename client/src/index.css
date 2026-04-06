@@ -6,12 +6,20 @@
 
 /* ── Seasonal theme CSS custom properties ─────────────────────────────────── */
 :root {
-  --th-accent:       #6b7c3a;
-  --th-accent-dim:   rgba(107, 124, 58, 0.13);
-  --th-accent-hover: rgba(107, 124, 58, 0.22);
-  --th-accent-text:  #8da05a;
-  --th-border:       rgba(107, 124, 58, 0.3);
-  --th-selection:    rgba(107, 124, 58, 0.3);
+  --th-accent:        #6b7c3a;
+  --th-accent-dim:    rgba(107, 124, 58, 0.13);
+  --th-accent-hover:  rgba(107, 124, 58, 0.22);
+  --th-accent-text:   #8da05a;
+  --th-border:        rgba(107, 124, 58, 0.3);
+  --th-selection:     rgba(107, 124, 58, 0.3);
+
+  /* Extended theme vars — visual depth */
+  --th-page-tint:     transparent;
+  --th-card-glow:     rgba(107, 124, 58, 0.18);
+  --th-price:         #8da05a;
+  --th-logo-border:   rgba(107, 124, 58, 0.4);
+  --th-logo-bg:       rgba(107, 124, 58, 0.15);
+  --th-nav-border:    rgba(107, 124, 58, 0.2);
 }
 
 @layer base {
@@ -53,6 +61,23 @@
     color: var(--th-accent-text);
   }
 
+  /* Theme-aware price color */
+  .th-price {
+    color: var(--th-price);
+  }
+
+  /* Theme-aware card hover glow */
+  .th-card:hover {
+    border-color: var(--th-border) !important;
+    box-shadow: 0 8px 32px var(--th-card-glow), 0 2px 8px rgba(0,0,0,0.4);
+  }
+
+  /* Page background tint overlay */
+  .th-page-tint {
+    background-color: var(--th-page-tint);
+    transition: background-color 0.6s ease;
+  }
+
   /* Seasonal banner strip */
   .seasonal-banner {
     position: relative;
@@ -62,7 +87,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 50%, transparent 100%);
     pointer-events: none;
   }
 

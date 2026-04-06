@@ -13,11 +13,11 @@ export default function SupportSuccessPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-8">
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-olive-500/30 bg-olive-500/10 text-xl text-olive-400">
+        <span className="th-btn inline-flex h-12 w-12 items-center justify-center rounded-2xl border text-xl">
           ✓
         </span>
 
-        <p className="mt-6 text-[10px] font-semibold uppercase tracking-[0.3em] text-olive-500">
+        <p className="mt-6 text-[10px] font-semibold uppercase tracking-[0.3em] th-text opacity-80">
           Request Received
         </p>
         <h1 className="mt-2 text-3xl font-bold text-zinc-100">

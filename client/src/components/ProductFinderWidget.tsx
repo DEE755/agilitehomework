@@ -26,7 +26,7 @@ function ProductCard({ slug, products, onSelect }: { slug: string; products: Pro
         <p className="text-[10px] text-zinc-500">{product.category}</p>
       </div>
       {product.price != null && (
-        <span className="shrink-0 text-sm font-bold text-olive-400">${product.price}</span>
+        <span className="shrink-0 text-sm font-bold th-price">${product.price}</span>
       )}
     </button>
   );
@@ -111,7 +111,7 @@ export default function ProductFinderWidget({ products, onSelectProduct }: Props
       {/* Floating trigger button */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full border border-olive-500/40 bg-zinc-950 px-4 py-2.5 text-xs font-semibold text-olive-400 shadow-2xl shadow-black/50 transition hover:border-olive-500/70 hover:bg-zinc-900 sm:bottom-6 sm:right-6 sm:gap-2.5 sm:px-5 sm:py-3 sm:text-sm"
+        className="th-btn fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full border px-4 py-2.5 text-xs font-semibold shadow-2xl shadow-black/50 transition sm:bottom-6 sm:right-6 sm:gap-2.5 sm:px-5 sm:py-3 sm:text-sm"
       >
         <span className="text-base">✦</span>
         Help me choose
@@ -132,7 +132,7 @@ export default function ProductFinderWidget({ products, onSelectProduct }: Props
           {/* Header */}
           <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 px-5 py-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-olive-500/40 bg-olive-500/10 text-sm">✦</div>
+              <div className="th-btn flex h-8 w-8 items-center justify-center rounded-full border text-sm">✦</div>
               <div>
                 <p className="text-sm font-semibold text-zinc-100">Product Advisor</p>
                 <p className="text-[10px] text-zinc-600">AI-powered product matching</p>
@@ -157,11 +157,11 @@ export default function ProductFinderWidget({ products, onSelectProduct }: Props
             {/* Initial loading */}
             {loading && responses.length === 0 && (
               <div className="flex gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-olive-500/40 bg-olive-500/10 text-xs text-olive-400 font-bold">✦</span>
-                <div className="rounded-xl rounded-tl-sm border border-olive-500/20 bg-olive-500/5 px-4 py-3">
+                <span className="th-btn flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold">✦</span>
+                <div className="rounded-xl rounded-tl-sm border px-4 py-3" style={{ borderColor: 'var(--th-border)', backgroundColor: 'var(--th-accent-dim)' }}>
                   <div className="flex items-center gap-1.5">
                     {[0, 150, 300].map((d) => (
-                      <span key={d} className="h-1.5 w-1.5 rounded-full bg-olive-400/60 animate-bounce" style={{ animationDelay: `${d}ms` }} />
+                      <span key={d} className="h-1.5 w-1.5 rounded-full animate-bounce" style={{ backgroundColor: 'var(--th-accent)', opacity: 0.6, animationDelay: `${d}ms` }} />
                     ))}
                   </div>
                 </div>
@@ -187,9 +187,9 @@ export default function ProductFinderWidget({ products, onSelectProduct }: Props
 
               return (
                 <div key={i} className="flex gap-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-olive-500/40 bg-olive-500/10 text-xs text-olive-400 font-bold">✦</span>
+                  <span className="th-btn flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold">✦</span>
                   <div className="flex-1 space-y-3">
-                    <div className="rounded-xl rounded-tl-sm border border-olive-500/20 bg-olive-500/5 px-4 py-3">
+                    <div className="rounded-xl rounded-tl-sm border px-4 py-3" style={{ borderColor: 'var(--th-border)', backgroundColor: 'var(--th-accent-dim)' }}>
                       <p className="text-xs leading-relaxed text-zinc-300">{msg.content}</p>
                     </div>
 
@@ -199,7 +199,7 @@ export default function ProductFinderWidget({ products, onSelectProduct }: Props
                       if (matched.length === 0) return null;
                       return (
                         <div className="space-y-2">
-                          <p className="text-[10px] font-semibold uppercase tracking-wider text-olive-600">Recommended for you</p>
+                          <p className="text-[10px] font-semibold uppercase tracking-wider th-text opacity-70">Recommended for you</p>
                           {matched.map((slug) => (
                             <ProductCard
                               key={slug}
@@ -219,7 +219,7 @@ export default function ProductFinderWidget({ products, onSelectProduct }: Props
                           <button
                             key={qr}
                             onClick={() => void sendMessage(qr)}
-                            className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-[11px] text-zinc-400 transition hover:border-olive-500/40 hover:text-olive-400"
+                            className="rounded-full border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-[11px] text-zinc-400 transition hover:border-[var(--th-border)] hover:text-[var(--th-accent-text)]"
                           >
                             {qr}
                           </button>
@@ -234,11 +234,11 @@ export default function ProductFinderWidget({ products, onSelectProduct }: Props
             {/* Loading next response */}
             {loading && responses.length > 0 && (
               <div className="flex gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-olive-500/40 bg-olive-500/10 text-xs text-olive-400 font-bold">✦</span>
-                <div className="rounded-xl rounded-tl-sm border border-olive-500/20 bg-olive-500/5 px-4 py-3">
+                <span className="th-btn flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold">✦</span>
+                <div className="rounded-xl rounded-tl-sm border px-4 py-3" style={{ borderColor: 'var(--th-border)', backgroundColor: 'var(--th-accent-dim)' }}>
                   <div className="flex items-center gap-1.5">
                     {[0, 150, 300].map((d) => (
-                      <span key={d} className="h-1.5 w-1.5 rounded-full bg-olive-400/60 animate-bounce" style={{ animationDelay: `${d}ms` }} />
+                      <span key={d} className="h-1.5 w-1.5 rounded-full animate-bounce" style={{ backgroundColor: 'var(--th-accent)', opacity: 0.6, animationDelay: `${d}ms` }} />
                     ))}
                   </div>
                 </div>
@@ -256,12 +256,12 @@ export default function ProductFinderWidget({ products, onSelectProduct }: Props
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="your@email.com"
-                    className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none focus:border-olive-500/60"
+                    className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 outline-none focus:border-[var(--th-border)]"
                   />
                   <button
                     onClick={() => void handleEmailSave()}
                     disabled={!email.trim()}
-                    className="rounded-lg border border-olive-500/30 bg-olive-500/10 px-3 py-2 text-xs font-semibold text-olive-400 transition hover:bg-olive-500/20 disabled:opacity-40"
+                    className="th-btn rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:opacity-40"
                   >
                     Save
                   </button>
@@ -270,7 +270,7 @@ export default function ProductFinderWidget({ products, onSelectProduct }: Props
             )}
 
             {emailSaved && (
-              <p className="text-center text-[11px] text-olive-500">✓ Recommendations saved to your email</p>
+              <p className="text-center text-[11px] th-text">✓ Recommendations saved to your email</p>
             )}
 
             <div ref={bottomRef} />
@@ -286,12 +286,12 @@ export default function ProductFinderWidget({ products, onSelectProduct }: Props
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && input.trim()) { e.preventDefault(); void sendMessage(input); } }}
                 disabled={loading}
                 placeholder="Type your answer or question…"
-                className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-olive-500/30 disabled:opacity-50"
+                className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-[var(--th-border)] disabled:opacity-50"
               />
               <button
                 onClick={() => { if (input.trim()) void sendMessage(input); }}
                 disabled={loading || !input.trim()}
-                className="rounded-lg border border-olive-500/40 bg-olive-500/15 px-4 py-2.5 text-xs font-semibold text-olive-400 transition hover:bg-olive-500/25 disabled:opacity-40"
+                className="th-btn rounded-lg border px-4 py-2.5 text-xs font-semibold transition disabled:opacity-40"
               >
                 {loading ? '…' : '↑'}
               </button>

@@ -19,13 +19,33 @@ function SeasonalBanner() {
 
   return (
     <div
-      className="seasonal-banner relative z-20 w-full py-2 text-center text-xs font-semibold tracking-wide text-white/90 transition-all duration-500"
+      className="seasonal-banner relative z-20 w-full py-3 text-center text-sm font-semibold tracking-wide text-white/95 shadow-lg transition-all duration-500"
       style={{ background: theme.banner.gradient }}
     >
-      <span className="mr-2">{theme.emoji}</span>
+      <span className="mr-2.5 text-base">{theme.emoji}</span>
       {theme.banner.text}
-      <span className="ml-2">{theme.emoji}</span>
+      <span className="ml-2.5 text-base">{theme.emoji}</span>
     </div>
+  );
+}
+
+function PageTintOverlay() {
+  const [themeId, setThemeId] = useState<string>(() => localStorage.getItem(STOREFRONT_THEME_KEY) ?? 'default');
+
+  useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.key === STOREFRONT_THEME_KEY) setThemeId(e.newValue ?? 'default');
+    }
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  if (themeId === 'default') return null;
+  return (
+    <div
+      className="pointer-events-none fixed inset-0 z-0 th-page-tint"
+      aria-hidden="true"
+    />
   );
 }
 
@@ -37,10 +57,11 @@ export default function Layout() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="relative min-h-screen bg-zinc-950">
+      <PageTintOverlay />
       <SeasonalBanner />
       <Navbar />
-      <main className="mx-auto max-w-5xl px-4 py-8">
+      <main className="relative z-10 mx-auto max-w-5xl px-4 py-8">
         <Outlet />
       </main>
     </div>

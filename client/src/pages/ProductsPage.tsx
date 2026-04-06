@@ -140,7 +140,7 @@ function ProductModal({ product, allProducts, onClose, onGetHelp, onSelect }: {
             <div>
               <h2 className="text-xl font-bold text-zinc-100">{product.name}</h2>
               {product.price != null && (
-                <p className="mt-1 text-lg font-semibold text-olive-400">${product.price}</p>
+                <p className="mt-1 text-lg font-semibold th-price">${product.price}</p>
               )}
             </div>
             {product.sku && <span className="shrink-0 font-mono text-[10px] text-zinc-600 mt-1">{product.sku}</span>}
@@ -187,7 +187,7 @@ function ProductModal({ product, allProducts, onClose, onGetHelp, onSelect }: {
                       <div className="w-full min-w-0">
                         <p className="truncate text-xs font-semibold text-zinc-200">{p.name}</p>
                         <p className="text-[10px] text-zinc-600">{p.category}</p>
-                        {p.price != null && <p className="text-[10px] font-semibold text-olive-400">${p.price}</p>}
+                        {p.price != null && <p className="text-[10px] font-semibold th-price">${p.price}</p>}
                       </div>
                     </button>
                   );
@@ -273,7 +273,7 @@ export default function ProductsPage() {
             value={query}
             onChange={(e) => handleFilterChange(() => setQuery(e.target.value))}
             placeholder="Search by name, category, or SKU…"
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-900 py-2.5 pl-8 pr-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-olive-500/30"
+            className="w-full rounded-lg border border-zinc-800 bg-zinc-900 py-2.5 pl-8 pr-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[var(--th-border)]"
           />
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -319,7 +319,7 @@ export default function ProductsPage() {
           <p className="text-sm text-red-400">{error}</p>
           <button
             onClick={reload}
-            className="mt-3 text-xs font-medium text-olive-400 hover:underline"
+            className="mt-3 text-xs font-medium th-text hover:underline"
           >
             Retry
           </button>
@@ -336,7 +336,7 @@ export default function ProductsPage() {
           {products.length > 0 && (
             <button
               onClick={() => { setQuery(''); setActiveCategory('All'); }}
-              className="mt-3 text-xs font-medium text-olive-400 hover:underline"
+              className="mt-3 text-xs font-medium th-text hover:underline"
             >
               Clear filters
             </button>
@@ -347,7 +347,7 @@ export default function ProductsPage() {
           {paginated.map((product) => (
             <div
               key={product._id}
-              className="group flex flex-col rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden transition hover:border-zinc-700 hover:shadow-xl hover:shadow-black/30 cursor-pointer"
+              className="th-card group flex flex-col rounded-xl border border-zinc-800 bg-zinc-900 overflow-hidden transition-all duration-300 cursor-pointer"
               onClick={() => setSelectedProduct(product)}
             >
               {/* Image */}
@@ -363,7 +363,7 @@ export default function ProductsPage() {
                 <div className="flex items-start justify-between gap-2">
                   <h2 className="text-sm font-bold text-zinc-100">{product.name}</h2>
                   {product.price != null && (
-                    <span className="shrink-0 text-sm font-semibold text-olive-400">${product.price}</span>
+                    <span className="shrink-0 text-sm font-semibold th-price">${product.price}</span>
                   )}
                 </div>
                 <div className="mt-1.5 flex-1">

@@ -28,7 +28,6 @@ import type { TicketStatus, TicketPriority } from '../../types/ticket';
 import StatusBadge from '../../components/StatusBadge';
 import PriorityBadge from '../../components/PriorityBadge';
 import { TicketCardSkeleton } from '../../components/Skeleton';
-import InsightsPanel from '../../components/admin/InsightsPanel';
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
@@ -234,7 +233,6 @@ export default function AdminDashboardPage() {
   const [priority,   setPriority]   = useState<PriorityFilter>('all');
   const [assignedTo, setAssignedTo] = useState<string>('');
   const [activeTag,  setActiveTag]  = useState<string>('');
-  const [insightsOpen, setInsightsOpen] = useState(false);
   const [sortBy,     setSortBy]     = useState<SortKey>('date');
   const [showMktCols, setShowMktCols] = useState(false);
   const [page,       setPage]       = useState(1);
@@ -325,15 +323,6 @@ export default function AdminDashboardPage() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            onClick={() => setInsightsOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-semibold text-violet-400 transition hover:bg-violet-500/15"
-          >
-            <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
-              <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-            </svg>
-            AI Insights
-          </button>
           <button onClick={() => void fetchData()} className="rounded border border-zinc-800 px-3 py-2 text-xs font-medium text-zinc-500 transition hover:text-zinc-300">
             ↻ Refresh
           </button>
@@ -446,8 +435,6 @@ export default function AdminDashboardPage() {
           </button>
         </div>
       )}
-
-      <InsightsPanel open={insightsOpen} onClose={() => setInsightsOpen(false)} />
 
       {/* Table */}
       {!loading && !error && tickets.length > 0 && (

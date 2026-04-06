@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom';
 import SettingsPanel from './SettingsPanel';
+import InsightsPanel from './InsightsPanel';
 import NotificationBell from './NotificationBell';
 import { adminApi, getStoredAgent } from '../../services/adminApi';
 import { useToast } from '../Toast';
@@ -278,6 +279,7 @@ function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate }: {
 
 export default function AdminLayout() {
   const [settingsOpen,   setSettingsOpen]   = useState(false);
+  const [insightsOpen,   setInsightsOpen]   = useState(false);
   const [profileOpen,    setProfileOpen]    = useState(false);
   const [mobileNavOpen,  setMobileNavOpen]  = useState(false);
   const navigate = useNavigate();
@@ -349,6 +351,16 @@ export default function AdminLayout() {
             <Link to="/products" className="hidden rounded border border-zinc-800 px-2.5 py-1.5 text-xs font-medium text-zinc-500 transition hover:border-zinc-700 hover:text-zinc-300 sm:block">
               Customer Portal
             </Link>
+            <button
+              onClick={() => setInsightsOpen(true)}
+              className="hidden items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-1.5 text-xs font-semibold text-violet-400 transition hover:bg-violet-500/15 sm:flex"
+              title="AI Insights"
+            >
+              <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
+                <path d="M8 1l1.5 4.5H14l-3.5 2.5 1.5 4.5L8 10 4 12.5l1.5-4.5L2 5.5h4.5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              </svg>
+              AI Insights
+            </button>
             <NotificationBell />
             <button
               onClick={() => setSettingsOpen(true)}
@@ -413,6 +425,7 @@ export default function AdminLayout() {
       </main>
 
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <InsightsPanel open={insightsOpen} onClose={() => setInsightsOpen(false)} />
       <ProfilePanel
         open={profileOpen}
         onClose={() => setProfileOpen(false)}

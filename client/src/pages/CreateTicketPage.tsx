@@ -426,7 +426,7 @@ export default function CreateTicketPage() {
               <button
                 type="submit"
                 disabled={aiAsk.stage === 'asking' || !aiQuestion.trim()}
-                className="shrink-0 rounded border border-olive-500/40 bg-olive-500/15 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-olive-400 transition hover:bg-olive-500/25 disabled:opacity-40"
+                className="th-btn shrink-0 rounded border px-4 py-2 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-40"
               >
                 {aiAsk.stage === 'asking' ? '…' : 'Ask AI'}
               </button>
@@ -613,7 +613,7 @@ export default function CreateTicketPage() {
             <button
               type="submit"
               disabled={submitStage !== 'idle'}
-              className="rounded border border-olive-500/40 bg-olive-500/15 px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-olive-400 transition hover:bg-olive-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+              className="th-btn rounded border px-6 py-2.5 text-xs font-semibold uppercase tracking-wider transition disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitStage === 'uploading'
                 ? 'Uploading Images…'
