@@ -68,24 +68,32 @@ export async function listAdminTickets(req: Request, res: Response): Promise<voi
     Ticket.countDocuments(filter),
   ]);
 
-  // Re-resolve product imageUrls from R2 (snapshot URLs expire after 15 min)
-  const slugs = [...new Set(
+  // Re-resolve R2-hosted product images only — getSignedUrl creates valid-looking URLs for
+  // ANY key regardless of existence, so we must not call it for external (imgur/CDN) slugs.
+  // The R2_PRODUCT_SLUGS set contains only the slugs we actually seeded into R2.
+  const R2_PRODUCT_SLUGS = new Set([
+    'plate-carrier-mk2', 'assault-pack-45l', 'cqb-belt-system', 'tac-gloves-pro',
+    'combat-knee-pad-set', 'comms-headset-adapter', 'admin-chest-rig', 'hydration-bladder-3l',
+  ]);
+  const r2Slugs = [...new Set(
     tickets
       .map(t => (t.product as Record<string, unknown> | null | undefined)?.slug as string | undefined)
-      .filter((s): s is string => Boolean(s)),
+      .filter((s): s is string => Boolean(s) && R2_PRODUCT_SLUGS.has(s)),
   )];
   const imageUrlMap = new Map<string, string | null>();
   await Promise.all(
-    slugs.map(async (slug) => {
+    r2Slugs.map(async (slug) => {
       imageUrlMap.set(slug, await getObjectUrl(`products/${slug}.jpg`) ?? null);
     }),
   );
   const enrichedTickets = tickets.map((t) => {
     const snap = t.product as Record<string, unknown> | null | undefined;
-    if (!snap?.slug) return t;
-    // Prefer R2-resolved URL; fall back to the URL stored in the snapshot (e.g. external CDN)
-    const r2Url = imageUrlMap.get(String(snap.slug));
-    return { ...t, product: { ...snap, imageUrl: r2Url ?? (snap.imageUrl as string | null) ?? null } };
+    if (!snap) return t;
+    const slug = snap.slug as string | null | undefined;
+    // Only override imageUrl when we have a confirmed R2 URL for this slug
+    const r2Url = slug ? imageUrlMap.get(slug) : undefined;
+    if (r2Url) return { ...t, product: { ...snap, imageUrl: r2Url } };
+    return t;
   });
 
   res.json({
