@@ -596,10 +596,10 @@ export default function AdminDashboardPage() {
                                 <img
                                   src={ticket.product.imageUrl}
                                   alt={ticket.product.name}
-                                  className="hidden h-9 w-9 shrink-0 rounded-md object-cover sm:block"
+                                  className="h-9 w-9 shrink-0 rounded-md object-cover"
                                 />
                               ) : ticket.product ? (
-                                <div className={`hidden h-9 w-9 shrink-0 items-center justify-center rounded-md border text-xs font-bold sm:flex ${pp?.bg} ${pp?.text} ${pp?.border}`}>
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border text-xs font-bold ${pp?.bg} ${pp?.text} ${pp?.border}`}>
                                   {ticket.product.name[0]?.toUpperCase()}
                                 </div>
                               ) : null}
