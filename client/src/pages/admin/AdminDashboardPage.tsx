@@ -624,12 +624,12 @@ export default function AdminDashboardPage() {
                             {ticket.assignedTo.name}{ticket.assignedTo._id === currentAgentId ? <span className="ml-1 text-zinc-600">(you)</span> : null}
                           </span>
                           {ticket.assignedTo.isAiAgent && ticket.aiAutoAssigned && (
-                            <span className="inline-flex w-fit items-center gap-1 rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-violet-400">
+                            <span className="inline-flex w-fit items-center gap-1 rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-violet-400 whitespace-nowrap">
                               ✦ auto-assigned
                             </span>
                           )}
                           {ticket.aiEscalated && (
-                            <span className="inline-flex w-fit items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-amber-400">
+                            <span className="inline-flex w-fit items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-amber-400 whitespace-nowrap">
                               ⚠ Escalated by AI
                             </span>
                           )}

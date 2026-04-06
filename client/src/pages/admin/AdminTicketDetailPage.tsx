@@ -1795,7 +1795,7 @@ export default function AdminTicketDetailPage() {
                 {suggestResult.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {suggestResult.tags.map((tag) => (
-                      <span key={tag} className="rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500">{tag}</span>
+                      <span key={tag} className="rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500 whitespace-nowrap">{tag.replace(/\n/g, ' ').trim()}</span>
                     ))}
                   </div>
                 )}
@@ -1823,7 +1823,7 @@ export default function AdminTicketDetailPage() {
                 {aiResult.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {aiResult.tags.map((tag) => (
-                      <span key={tag} className="rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500">{tag}</span>
+                      <span key={tag} className="rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-500 whitespace-nowrap">{tag.replace(/\n/g, ' ').trim()}</span>
                     ))}
                   </div>
                 )}
