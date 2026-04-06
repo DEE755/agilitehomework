@@ -23,6 +23,7 @@ import {
   markAllNotificationsRead,
   changePassword,
   presignAvatarUpload,
+  getProfile,
   updateProfile,
   getAiInsights,
   emailAiInsights,
@@ -72,6 +73,7 @@ router.patch('/agents/:agentId/rating',       requireRole('admin'), updateAgentR
 router.patch('/settings',                               requireRole('admin'), updateSettings);
 router.post('/settings/ai-avatar/presign',              requireRole('admin'), presignAiAvatarUpload);
 router.patch('/settings/ai-avatar',                     requireRole('admin'), updateAiAgentAvatar);
+router.get('/profile',                                getProfile);
 router.patch('/profile/password',                     changePassword);
 router.patch('/profile',                              updateProfile);
 router.post('/profile/avatar/presign',                presignAvatarUpload);

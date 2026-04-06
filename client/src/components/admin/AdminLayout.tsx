@@ -496,6 +496,20 @@ export default function AdminLayout() {
     return () => window.removeEventListener('open-store-settings', onOpenSettings);
   }, []);
 
+  // Refresh avatar URL on mount — signed URLs expire after 15 min
+  useEffect(() => {
+    adminApi.getProfile().then(({ data }) => {
+      if (data.avatarUrl == null) return;
+      setAgent((prev) => {
+        if (!prev) return prev;
+        const updated = { ...prev, avatarUrl: data.avatarUrl! };
+        localStorage.setItem(AGENT_KEY, JSON.stringify(updated));
+        return updated;
+      });
+    }).catch(() => null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function handleThemeChange(t: 'dark' | 'light') {
     setAdminTheme(t);
     localStorage.setItem(ADMIN_THEME_KEY, t);

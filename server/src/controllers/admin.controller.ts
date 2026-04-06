@@ -739,6 +739,16 @@ export async function updateAgentRating(req: Request, res: Response): Promise<vo
   res.json({ data: { manualRating: agent.manualRating } });
 }
 
+// GET /api/admin/profile
+export async function getProfile(req: Request, res: Response): Promise<void> {
+  const agentId = req.agent?._id;
+  if (!agentId) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  const user = await User.findById(agentId).lean();
+  if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+  const avatarUrl = user.avatarKey ? await getObjectUrl(user.avatarKey) : undefined;
+  res.json({ data: { avatarUrl: avatarUrl ?? null } });
+}
+
 // PATCH /api/admin/profile
 export async function updateProfile(req: Request, res: Response): Promise<void> {
   const agentId = req.agent?._id;

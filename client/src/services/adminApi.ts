@@ -167,6 +167,10 @@ export const adminApi = {
     return req('/agents', { method: 'POST', body: JSON.stringify(data) });
   },
 
+  getProfile(): Promise<{ data: { avatarUrl: string | null } }> {
+    return req('/profile');
+  },
+
   changePassword(data: { currentPassword: string; newPassword: string }): Promise<{ data: { ok: boolean } }> {
     return req('/profile/password', { method: 'PATCH', body: JSON.stringify(data) });
   },
