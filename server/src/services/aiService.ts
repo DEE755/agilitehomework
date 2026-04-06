@@ -34,9 +34,9 @@ export interface SuggestReplyResult {
 // ---------------------------------------------------------------------------
 
 function getAiConfig() {
-  const apiKey = process.env.PYDANTIC_AI_GATEWAY_API_KEY ?? '';
+  const apiKey = process.env.PYDANTIC_AI_GATEWAY_API_KEY ?? process.env.PYDANTIC_GATEWAY_API_KEY ?? '';
   const region = process.env.PYDANTIC_GATEWAY_REGION ?? 'us';
-  const model  = process.env.PYDANTIC_ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
+  const model  = process.env.PYDANTIC_ANTHROPIC_MODEL ?? process.env.PYDANTIC_GATEWAY_MODEL ?? 'claude-sonnet-4-6';
 
   if (!apiKey) throw new Error('PYDANTIC_AI_GATEWAY_API_KEY is not configured');
 

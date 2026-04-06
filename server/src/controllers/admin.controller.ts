@@ -83,7 +83,9 @@ export async function listAdminTickets(req: Request, res: Response): Promise<voi
   const enrichedTickets = tickets.map((t) => {
     const snap = t.product as Record<string, unknown> | null | undefined;
     if (!snap?.slug) return t;
-    return { ...t, product: { ...snap, imageUrl: imageUrlMap.get(String(snap.slug)) ?? null } };
+    // Prefer R2-resolved URL; fall back to the URL stored in the snapshot (e.g. external CDN)
+    const r2Url = imageUrlMap.get(String(snap.slug));
+    return { ...t, product: { ...snap, imageUrl: r2Url ?? (snap.imageUrl as string | null) ?? null } };
   });
 
   res.json({

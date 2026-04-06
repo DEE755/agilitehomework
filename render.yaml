@@ -73,12 +73,12 @@ services:
         sync: false   # optional: https://pub-<hash>.r2.dev  (skips signed URLs)
 
       # ── Pydantic AI Gateway (LLM proxy) ───────────────────────────────────
-      - key: PYDANTIC_GATEWAY_BASE_URL
-        sync: false   # e.g. https://your-ai-gateway.onrender.com
-      - key: PYDANTIC_GATEWAY_API_KEY
-        sync: false
-      - key: PYDANTIC_GATEWAY_MODEL
-        value: gpt-4o-mini   # override per-deployment if needed
+      - key: PYDANTIC_AI_GATEWAY_API_KEY
+        sync: false   # API key from pydantic.dev dashboard
+      - key: PYDANTIC_GATEWAY_REGION
+        value: us     # gateway region prefix (us, eu, …)
+      - key: PYDANTIC_ANTHROPIC_MODEL
+        value: claude-sonnet-4-6   # model ID passed to Bedrock Converse
 
       # ── Logfire (optional distributed tracing) ────────────────────────────
       - key: LOGFIRE_TOKEN
