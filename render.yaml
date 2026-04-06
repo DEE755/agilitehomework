@@ -21,7 +21,7 @@ services:
     runtime: node
     plan: free                # explicitly opt into the free instance (default is starter = paid)
     rootDir: server
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /health
     # Render injects PORT=10000 automatically; the server reads process.env.PORT

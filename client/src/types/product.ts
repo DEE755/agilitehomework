@@ -7,4 +7,5 @@ export interface Product {
   sku: string;
   price?: number;
   imageUrl?: string;
+  isActive?: boolean;
 }

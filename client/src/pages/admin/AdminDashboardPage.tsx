@@ -22,7 +22,7 @@ function productPalette(name: string) {
   return PRODUCT_PALETTES[h % PRODUCT_PALETTES.length];
 }
 import { Link } from 'react-router-dom';
-import { adminApi } from '../../services/adminApi';
+import { adminApi, getStoredAgent } from '../../services/adminApi';
 import type { AdminTicketSummary, AdminStats, Agent } from '../../types/admin';
 import type { TicketStatus, TicketPriority } from '../../types/ticket';
 import StatusBadge from '../../components/StatusBadge';
@@ -222,6 +222,7 @@ const STATUS_OPTS: { label: string; value: StatusFilter }[] = [
 ];
 
 export default function AdminDashboardPage() {
+  const currentAgentId = getStoredAgent()?._id;
   const [tickets, setTickets]   = useState<AdminTicketSummary[]>([]);
   const [stats,   setStats]     = useState<AdminStats | null>(null);
   const [agents,  setAgents]    = useState<Agent[]>([]);
@@ -535,7 +536,7 @@ export default function AdminDashboardPage() {
                                 {ticket.assignedTo.name[0]?.toUpperCase()}
                               </span>
                             )}
-                            {ticket.assignedTo.name}
+                            {ticket.assignedTo.name}{ticket.assignedTo._id === currentAgentId ? <span className="ml-1 text-zinc-600">(you)</span> : null}
                           </span>
                           {ticket.assignedTo.isAiAgent && ticket.aiAutoAssigned && (
                             <span className="inline-flex w-fit items-center gap-1 rounded-full border border-violet-500/25 bg-violet-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-violet-400">

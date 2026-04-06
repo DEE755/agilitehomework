@@ -76,7 +76,7 @@ export async function createTicket(req: Request, res: Response): Promise<void> {
     ticketData.product = {
       _id:         productId,
       name:        productName,
-      category:    productCategory ?? null,
+      category:    productCategory ?? undefined,
       description: productDescription ?? null,
       price:       productPrice ?? null,
       imageUrl:    productImageUrl ?? null,

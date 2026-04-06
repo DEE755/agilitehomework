@@ -143,7 +143,7 @@ export const adminApi = {
       });
     },
 
-    reply(id: string, body: string): Promise<{ data: Reply }> {
+    reply(id: string, body: string): Promise<{ data: { reply: Reply; assignedTo: AdminTicket['assignedTo'] } }> {
       return req(`/tickets/${id}/reply`, {
         method: 'POST',
         body: JSON.stringify({ body }),

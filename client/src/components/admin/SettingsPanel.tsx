@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { adminApi } from '../../services/adminApi';
 import type { AppSettings } from '../../types/admin';
-import { THEMES, applyTheme, getTheme } from '../../themes/seasonal';
+import { THEMES, applyTheme as applySeasonalTheme, getTheme } from '../../themes/seasonal';
 
 interface Props {
   open: boolean;
@@ -79,7 +79,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
     adminApi.settings.get()
       .then((res) => {
         setSettings(res.data);
-        if (res.data.activeTheme) applyTheme(res.data.activeTheme);
+        if (res.data.activeTheme) applySeasonalTheme(res.data.activeTheme);
       })
       .catch((e: Error) => setError(e.message));
   }, [open]);
@@ -116,7 +116,7 @@ export default function SettingsPanel({ open, onClose }: Props) {
   async function applyTheme(themeId: string) {
     if (!settings) return;
     // Live preview immediately so the admin can see what they confirmed
-    applyTheme(themeId);
+    applySeasonalTheme(themeId);
     const prev = settings;
     setSettings({ ...settings, activeTheme: themeId === 'default' ? null : themeId });
     setSaving(true);
