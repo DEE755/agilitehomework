@@ -543,6 +543,11 @@ export default function AdminDashboardPage() {
                               ✦ auto-assigned
                             </span>
                           )}
+                          {ticket.aiEscalated && (
+                            <span className="inline-flex w-fit items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold text-amber-400">
+                              ⚠ Escalated by AI
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-xs text-zinc-700">Unassigned</span>

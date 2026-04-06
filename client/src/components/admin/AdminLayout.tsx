@@ -256,7 +256,7 @@ function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate, adminTheme, onT
                         : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
-                    {l === 'en' ? 'EN' : 'עב'}
+                    {l === 'en' ? 'EN' : 'א'}
                   </button>
                 ))}
               </div>

@@ -16,8 +16,9 @@ function timeAgo(dateStr: string): string {
 }
 
 const TYPE_ICON: Record<AppNotification['type'], string> = {
-  ticket_assigned: '📋',
+  ticket_assigned:  '📋',
   customer_replied: '💬',
+  ai_escalated:     '⚠',
 };
 
 export default function NotificationBell() {

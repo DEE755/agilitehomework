@@ -7,6 +7,7 @@ import { triageTicket } from '../services/aiService';
 import { getOrCreateSettings } from '../models/Setting';
 import { User, AI_AGENT_EMAIL } from '../models/User';
 import { notifyCustomerReplied } from '../services/notificationService';
+import { runAiAgentPipeline } from '../services/aiAgentService';
 import { sendTicketConfirmationEmail } from '../services/emailService';
 
 // GET /api/tickets
@@ -201,8 +202,17 @@ export async function addReply(req: Request, res: Response): Promise<void> {
   const reply = ticket.replies[ticket.replies.length - 1];
   res.status(201).json({ data: reply });
 
-  // Notify the assigned agent that the customer replied (fire-and-forget)
-  if (ticket.assignedTo) {
+  // If the ticket is handled by the AI agent, re-run the pipeline with the new message.
+  // Otherwise notify the assigned human agent as usual.
+  const aiAgent = await User.findOne({ isAiAgent: true }).lean();
+  const isAiAssigned = aiAgent && ticket.assignedTo &&
+    String(ticket.assignedTo) === String(aiAgent._id);
+
+  if (isAiAssigned) {
+    void runAiAgentPipeline(String(ticket._id), true).catch(
+      (err: unknown) => console.error('[addReply] AI pipeline failed:', err),
+    );
+  } else if (ticket.assignedTo) {
     void notifyCustomerReplied(ticket.assignedTo as import('mongoose').Types.ObjectId, ticket._id, ticket.title).catch(
       (err: unknown) => console.error('[addReply] notify failed:', err),
     );

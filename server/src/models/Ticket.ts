@@ -87,6 +87,8 @@ const ticketSchema = new Schema<TicketDocument>(
     aiTags:              { type: [String], default: [] },
     aiTriagedAt:         { type: Date, default: null },
     aiAutoAssigned:      { type: Boolean, default: false },
+    aiAssignedBy:        { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    aiEscalated:         { type: Boolean, default: false },
     // Customer Intelligence fields — populated by POST /api/ai/customer-profile
     mktArchetype:           { type: String, default: null },
     mktArchetypeLabel:      { type: String, default: null },

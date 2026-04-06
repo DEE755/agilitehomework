@@ -7,7 +7,7 @@ const en = {
     openTicket: 'Open Ticket',
     admin: 'Admin',
     customerSupport: 'Customer Support',
-    switchToHe: 'עב',
+    switchToHe: 'א',
     switchToEn: 'EN',
   },
   products: {
@@ -134,7 +134,7 @@ const he: typeof en = {
     openTicket: 'פתח פנייה',
     admin: 'מנהל',
     customerSupport: 'תמיכת לקוחות',
-    switchToHe: 'עב',
+    switchToHe: 'א',
     switchToEn: 'EN',
   },
   products: {

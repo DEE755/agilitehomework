@@ -149,9 +149,16 @@ export async function assignTicket(req: Request, res: Response): Promise<void> {
     if (!assignedAgent) { res.status(404).json({ error: 'Agent not found' }); return; }
   }
 
+  const actingAgent = getActingAgent(req);
+  const updateFields: Record<string, unknown> = { assignedTo: agentId ?? null };
+  if (assignedAgent?.isAiAgent && isValidObjectId(String(actingAgent._id))) {
+    updateFields.aiAssignedBy = actingAgent._id;
+    updateFields.aiEscalated  = false; // reset if re-assigned to AI
+  }
+
   const ticket = await Ticket.findByIdAndUpdate(
     ticketId,
-    { assignedTo: agentId ?? null },
+    updateFields,
     { new: true },
   ).populate('assignedTo', 'name email isAiAgent');
 

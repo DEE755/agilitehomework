@@ -1649,7 +1649,7 @@ export default function AdminTicketDetailPage() {
             >
               <option value="">— Unassigned —</option>
               {agents.filter((a) => a.isAiAgent).map((a) => (
-                <option key={a._id} value={a._id}>✦ {a.name} (Auto-reply)</option>
+                <option key={a._id} value={a._id}>✦ {a.name} — Autonomous Handling</option>
               ))}
               {agents.filter((a) => !a.isAiAgent).map((a) => (
                 <option key={a._id} value={a._id}>{a.name}{a._id === currentAgentId ? ' (you)' : ''}</option>
@@ -1659,7 +1659,7 @@ export default function AdminTicketDetailPage() {
             {pendingAgentId && (
               <div className="mt-3 rounded-lg border border-violet-500/25 bg-violet-500/5 p-3">
                 <p className="text-[11px] text-violet-300">
-                  AI Agent will automatically reply to this ticket. Confirm the assignment?
+                  The AI Agent will autonomously manage this ticket end-to-end — handling replies, assessing each customer response, and escalating to you if human expertise is required. Confirm?
                 </p>
                 <div className="mt-2 flex gap-2">
                   <button
@@ -1690,7 +1690,14 @@ export default function AdminTicketDetailPage() {
                     Manually assigned to AI
                   </span>
                 )}
-                <p className="text-[10px] text-zinc-600">AI Agent will reply automatically</p>
+                <p className="text-[10px] text-zinc-600">AI Agent handles the full conversation autonomously</p>
+              </div>
+            )}
+
+            {ticket.aiEscalated && (
+              <div className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/5 px-3 py-2.5">
+                <p className="text-[10px] font-semibold text-amber-400">⚠ Escalated by AI Agent</p>
+                <p className="mt-0.5 text-[10px] text-zinc-500">The AI determined this ticket requires human expertise and has reassigned it. See the internal notes for the reason.</p>
               </div>
             )}
           </div>

@@ -42,6 +42,7 @@ export interface AdminTicketSummary extends TicketSummary {
   aiPriority?: 'low' | 'medium' | 'high' | 'irrelevant' | null;
   aiTriagedAt?: string | null;
   aiAutoAssigned?: boolean;
+  aiEscalated?: boolean;
   product?: { _id: string; name: string; category: string; price?: number | null; imageUrl?: string | null } | null;
   // Customer Intelligence (populated when ticket has been analyzed)
   mktArchetype?: string | null;
@@ -74,6 +75,7 @@ export interface AdminTicket extends Omit<Ticket, 'replies'> {
   aiTags?: string[];
   aiTriagedAt?: string | null;
   aiAutoAssigned?: boolean;
+  aiEscalated?: boolean;
   // Customer Intelligence (persisted)
   mktArchetype?: string | null;
   mktArchetypeLabel?: string | null;
@@ -192,7 +194,7 @@ export type AdminTicketFilters = {
   limit?: number;
 };
 
-export type NotificationType = 'ticket_assigned' | 'customer_replied';
+export type NotificationType = 'ticket_assigned' | 'customer_replied' | 'ai_escalated';
 
 export interface AppNotification {
   _id: string;

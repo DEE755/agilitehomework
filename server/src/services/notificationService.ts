@@ -45,6 +45,33 @@ export async function notifyAssigned(
   }
 }
 
+export async function notifyAiEscalated(
+  agentId: Types.ObjectId | string,
+  ticketId: Types.ObjectId | string,
+  ticketTitle: string,
+): Promise<void> {
+  const message = `AI Agent flagged ticket "${ticketTitle}" for human review and has reassigned it to you.`;
+
+  await Notification.create({ agentId, type: 'ai_escalated', ticketId, ticketTitle, message });
+
+  const agent = await User.findById(agentId).lean();
+  if (agent && !agent.isAiAgent) {
+    void sendNotificationEmail(
+      agent.email,
+      '[Agilite] AI Agent escalated a ticket to you',
+      [
+        `Hi ${agent.name},`,
+        '',
+        `The AI Agent was unable to fully resolve ticket "${ticketTitle}" and has determined it requires human expertise.`,
+        '',
+        'The ticket has been reassigned to you. Please review the conversation and take over.',
+        '',
+        '— Agilite Support System',
+      ].join('\n'),
+    ).catch((err: unknown) => console.error('[notificationService] Email failed:', err));
+  }
+}
+
 export async function notifyCustomerReplied(
   agentId: Types.ObjectId | string,
   ticketId: Types.ObjectId | string,
