@@ -5,6 +5,9 @@ import InsightsPanel from './InsightsPanel';
 import NotificationBell from './NotificationBell';
 import { adminApi, getStoredAgent } from '../../services/adminApi';
 import { useToast } from '../Toast';
+import { useLanguage } from '../../i18n/LanguageContext';
+
+const ADMIN_THEME_KEY = 'admin-ui-theme';
 
 const TOKEN_KEY = 'ag_admin_token';
 const AGENT_KEY = 'ag_admin_agent';
@@ -83,14 +86,17 @@ function ChangePasswordModal({ onDone }: { onDone: () => void }) {
 const profileInputCls =
   'w-full rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-olive-500/60 focus:ring-1 focus:ring-olive-500/30';
 
-function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate }: {
+function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate, adminTheme, onThemeChange }: {
   open: boolean;
   onClose: () => void;
   onLogout: () => void;
   onAvatarUpdate: (url: string) => void;
+  adminTheme: 'dark' | 'light';
+  onThemeChange: (t: 'dark' | 'light') => void;
 }) {
   const agent = getStoredAgent();
   const { toast } = useToast();
+  const { lang, setLang } = useLanguage();
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Avatar
@@ -232,6 +238,51 @@ function ProfilePanel({ open, onClose, onLogout, onAvatarUpdate }: {
             </div>
           </div>
 
+          {/* Preferences */}
+          <div className="border-t border-zinc-800/60 pt-4 space-y-4">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-600">Preferences</p>
+
+            {/* Language */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-zinc-400">Language</span>
+              <div className="flex rounded-lg border border-zinc-800 overflow-hidden">
+                {(['en', 'he'] as const).map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => setLang(l)}
+                    className={`px-3 py-1.5 text-[11px] font-semibold transition ${
+                      lang === l
+                        ? 'bg-zinc-700 text-zinc-100'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    {l === 'en' ? 'EN' : 'עב'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Display mode */}
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-zinc-400">Display</span>
+              <div className="flex rounded-lg border border-zinc-800 overflow-hidden">
+                {(['dark', 'light'] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => onThemeChange(t)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold transition ${
+                      adminTheme === t
+                        ? 'bg-zinc-700 text-zinc-100'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    {t === 'dark' ? '🌙 Dark' : '☀ Light'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {/* Change password — collapsible */}
           <div className="border-t border-zinc-800/60 pt-4">
             <button
@@ -284,6 +335,14 @@ export default function AdminLayout() {
   const [mobileNavOpen,  setMobileNavOpen]  = useState(false);
   const navigate = useNavigate();
   const [agent, setAgent] = useState(getStoredAgent);
+  const [adminTheme, setAdminTheme] = useState<'dark' | 'light'>(
+    () => (localStorage.getItem(ADMIN_THEME_KEY) as 'dark' | 'light') ?? 'dark'
+  );
+
+  function handleThemeChange(t: 'dark' | 'light') {
+    setAdminTheme(t);
+    localStorage.setItem(ADMIN_THEME_KEY, t);
+  }
 
   const [mustChange, setMustChange] = useState(() => agent?.mustChangePassword ?? false);
 
@@ -301,7 +360,7 @@ export default function AdminLayout() {
     ?.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2) ?? '?';
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div id="admin-root" className={`min-h-screen bg-zinc-950${adminTheme === 'light' ? ' admin-light' : ''}`}>
       {mustChange && <ChangePasswordModal onDone={() => setMustChange(false)} />}
 
       <header className="sticky top-0 z-10 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur-sm">
@@ -431,6 +490,8 @@ export default function AdminLayout() {
         onClose={() => setProfileOpen(false)}
         onLogout={handleLogout}
         onAvatarUpdate={handleAvatarUpdate}
+        adminTheme={adminTheme}
+        onThemeChange={handleThemeChange}
       />
     </div>
   );

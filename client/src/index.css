@@ -107,3 +107,42 @@
     display: none;
   }
 }
+
+/* ── Admin light mode ─────────────────────────────────────────────────────── */
+/* Scoped to #admin-root so the customer storefront is never affected.        */
+#admin-root.admin-light {
+  background-color: #f4f4f5;
+  color-scheme: light;
+}
+#admin-root.admin-light ::-webkit-scrollbar-track { background: #e4e4e7; }
+#admin-root.admin-light ::-webkit-scrollbar-thumb { background: #a1a1aa; }
+
+/* Backgrounds */
+#admin-root.admin-light .bg-zinc-950    { background-color: #ffffff !important; }
+#admin-root.admin-light .bg-zinc-950\/95{ background-color: rgba(255,255,255,0.97) !important; }
+#admin-root.admin-light .bg-zinc-900    { background-color: #f4f4f5 !important; }
+#admin-root.admin-light .bg-zinc-900\/40{ background-color: rgba(244,244,245,0.7) !important; }
+#admin-root.admin-light .bg-zinc-900\/60{ background-color: rgba(244,244,245,0.8) !important; }
+#admin-root.admin-light .bg-zinc-800    { background-color: #e4e4e7 !important; }
+#admin-root.admin-light .bg-zinc-700    { background-color: #d4d4d8 !important; }
+
+/* Borders */
+#admin-root.admin-light .border-zinc-800 { border-color: #d4d4d8 !important; }
+#admin-root.admin-light .border-zinc-700 { border-color: #a1a1aa !important; }
+
+/* Text */
+#admin-root.admin-light .text-zinc-100  { color: #18181b !important; }
+#admin-root.admin-light .text-zinc-200  { color: #27272a !important; }
+#admin-root.admin-light .text-zinc-300  { color: #3f3f46 !important; }
+#admin-root.admin-light .text-zinc-400  { color: #52525b !important; }
+#admin-root.admin-light .text-zinc-500  { color: #71717a !important; }
+#admin-root.admin-light .text-zinc-600  { color: #52525b !important; }
+#admin-root.admin-light .text-zinc-700  { color: #3f3f46 !important; }
+
+/* Placeholder text */
+#admin-root.admin-light .placeholder-zinc-600::placeholder { color: #a1a1aa !important; }
+
+/* Hover states */
+#admin-root.admin-light .hover\:bg-zinc-900\/60:hover { background-color: rgba(228,228,231,0.6) !important; }
+#admin-root.admin-light .hover\:bg-zinc-800:hover     { background-color: #d4d4d8 !important; }
+#admin-root.admin-light .hover\:border-zinc-700:hover { border-color: #a1a1aa !important; }
