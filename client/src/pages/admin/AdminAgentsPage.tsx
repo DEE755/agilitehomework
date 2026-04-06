@@ -32,9 +32,14 @@ function StatusDot({ status }: { status: AgentStatus }) {
   return <span className="h-2 w-2 shrink-0 rounded-full bg-zinc-700" />;
 }
 
-function StatusLabel({ status }: { status: AgentStatus }) {
-  if (status === 'online')  return <span className="text-[10px] font-semibold text-green-500">Connected</span>;
+function StatusLabel({ status, lastActiveAt }: { status: AgentStatus; lastActiveAt?: string | null }) {
   if (status === 'pending') return <span className="text-[10px] font-semibold text-amber-500">Pending setup</span>;
+  if (status === 'online')  return null; // dot alone is enough
+  if (lastActiveAt) {
+    const d = new Date(lastActiveAt);
+    const label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return <span className="text-[10px] text-zinc-600">Last connected: {label}</span>;
+  }
   return null;
 }
 
@@ -255,7 +260,7 @@ export default function AdminAgentsPage() {
                                   {agent.name}
                                   {isSelf && <span className="ml-1.5 text-[10px] text-zinc-600">(you)</span>}
                                 </p>
-                                <StatusLabel status={status} />
+                                <StatusLabel status={status} lastActiveAt={agent.lastActiveAt} />
                               </div>
                               <p className="text-xs text-zinc-600">{agent.email}</p>
                               <p className="mt-0.5 text-[10px] text-zinc-700 group-hover:text-olive-600 transition">
