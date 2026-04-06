@@ -44,6 +44,7 @@ export async function listProducts(_req: Request, res: Response): Promise<void> 
       category:    CATEGORY_NAMES[p.category?.id] ?? 'Miscellaneous',
       description: stripHtml(p.description ?? ''),
       sku:         `EXT-${p.id}`,
+      price:       p.price ?? null,
       imageUrl:    p.images?.[0] ?? undefined,
     }))
     .filter((p) => p.name);
