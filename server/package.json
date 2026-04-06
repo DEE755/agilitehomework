@@ -9,9 +9,6 @@
     "start": "node dist/index.js",
     "seed": "npm run seed:agent",
     "seed:agent": "ts-node-dev --transpile-only src/scripts/seed-agent.ts",
-    "seed:products": "ts-node-dev --transpile-only src/scripts/seed-products.ts",
-"seed:prices": "ts-node-dev --transpile-only src/scripts/seed-prices.ts",
-    "backfill:ticket-products": "ts-node-dev --transpile-only src/scripts/backfill-ticket-products.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1024.0",
