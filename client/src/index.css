@@ -159,6 +159,44 @@
 #admin-root:not(.admin-light) .hover\:text-zinc-200:hover    { color: #c4c8e0 !important; }
 #admin-root:not(.admin-light) .hover\:text-zinc-300:hover    { color: #9ea4c0 !important; }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   STOREFRONT DARK MODE — same midnight blue-slate palette as admin
+   ═══════════════════════════════════════════════════════════════════════════ */
+#storefront-root:not(.customer-light) {
+  background-color: #0b0d14;
+}
+#storefront-root:not(.customer-light) ::-webkit-scrollbar-track { background: #0e1018; }
+#storefront-root:not(.customer-light) ::-webkit-scrollbar-thumb { background: #272b42; border-radius: 9999px; }
+
+#storefront-root:not(.customer-light) .bg-zinc-950      { background-color: #0b0d14 !important; }
+#storefront-root:not(.customer-light) .bg-zinc-950\/95  { background-color: rgba(11,13,20,0.97) !important; }
+#storefront-root:not(.customer-light) .bg-zinc-900      { background-color: #121520 !important; }
+#storefront-root:not(.customer-light) .bg-zinc-900\/40  { background-color: rgba(18,21,32,0.5) !important; }
+#storefront-root:not(.customer-light) .bg-zinc-900\/60  { background-color: rgba(18,21,32,0.75) !important; }
+#storefront-root:not(.customer-light) .bg-zinc-800      { background-color: #1a1e2e !important; }
+#storefront-root:not(.customer-light) .bg-zinc-700      { background-color: #22273a !important; }
+
+#storefront-root:not(.customer-light) .border-zinc-800  { border-color: #1e2235 !important; }
+#storefront-root:not(.customer-light) .border-zinc-700  { border-color: #2b3050 !important; }
+
+#storefront-root:not(.customer-light) .text-zinc-100    { color: #e1e4f5 !important; }
+#storefront-root:not(.customer-light) .text-zinc-200    { color: #c4c8e0 !important; }
+#storefront-root:not(.customer-light) .text-zinc-300    { color: #9ea4c0 !important; }
+#storefront-root:not(.customer-light) .text-zinc-400    { color: #7880a0 !important; }
+#storefront-root:not(.customer-light) .text-zinc-500    { color: #555c7a !important; }
+#storefront-root:not(.customer-light) .text-zinc-600    { color: #404665 !important; }
+#storefront-root:not(.customer-light) .text-zinc-700    { color: #30365a !important; }
+
+#storefront-root:not(.customer-light) .placeholder\:text-zinc-600::placeholder { color: #404665 !important; }
+#storefront-root:not(.customer-light) .placeholder-zinc-600::placeholder       { color: #404665 !important; }
+
+#storefront-root:not(.customer-light) .hover\:bg-zinc-800:hover      { background-color: #1a1e2e !important; }
+#storefront-root:not(.customer-light) .hover\:bg-zinc-900\/60:hover  { background-color: rgba(18,21,32,0.75) !important; }
+#storefront-root:not(.customer-light) .hover\:border-zinc-700:hover  { border-color: #2b3050 !important; }
+#storefront-root:not(.customer-light) .hover\:text-zinc-100:hover    { color: #e1e4f5 !important; }
+#storefront-root:not(.customer-light) .hover\:text-zinc-200:hover    { color: #c4c8e0 !important; }
+#storefront-root:not(.customer-light) .hover\:text-zinc-300:hover    { color: #9ea4c0 !important; }
+
 /* ── Admin light mode ─────────────────────────────────────────────────────── */
 /* Scoped to #admin-root so the customer storefront is never affected.        */
 #admin-root.admin-light {
