@@ -30,7 +30,6 @@ export interface IProductSnapshot {
   description?: string | null;
   price?: number | null;
   imageUrl?: string | null;
-  slug?: string | null;
 }
 
 export interface ITicket {

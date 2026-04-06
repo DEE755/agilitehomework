@@ -127,7 +127,6 @@ interface FullProduct {
   category: string;
   description: string;
   sku: string;
-  slug: string;
   price: number | null;
   imageUrl: string | null;
 }

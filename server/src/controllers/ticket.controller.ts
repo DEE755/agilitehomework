@@ -54,7 +54,7 @@ export async function getTicket(req: Request, res: Response): Promise<void> {
 
 // POST /api/tickets
 export async function createTicket(req: Request, res: Response): Promise<void> {
-  const { title, description, authorName, authorEmail, productId, productName, productCategory, productDescription, productPrice, productImageUrl, productSlug } = req.body as CreateTicketBody;
+  const { title, description, authorName, authorEmail, productId, productName, productCategory, productDescription, productPrice, productImageUrl } = req.body as CreateTicketBody;
 
   let attachments;
   try {
@@ -70,7 +70,7 @@ export async function createTicket(req: Request, res: Response): Promise<void> {
     authorName: string;
     authorEmail: string;
     attachments: typeof attachments;
-    product?: { _id: string; name: string; category?: string; description?: string | null; price?: number | null; imageUrl?: string | null; slug?: string | null };
+    product?: { _id: string; name: string; category?: string; description?: string | null; price?: number | null; imageUrl?: string | null };
   } = { title, description, authorName, authorEmail, attachments };
 
   if (productId && productName) {
@@ -81,7 +81,6 @@ export async function createTicket(req: Request, res: Response): Promise<void> {
       description: productDescription ?? null,
       price:       productPrice ?? null,
       imageUrl:    productImageUrl ?? null,
-      slug:        productSlug ?? null,
     };
   }
 

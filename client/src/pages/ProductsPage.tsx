@@ -230,11 +230,11 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  // Auto-open modal when ?product=<slug> is present
+  // Auto-open modal when ?product=<id or slug> is present
   useEffect(() => {
-    const slug = searchParams.get('product');
-    if (!slug || products.length === 0) return;
-    const match = products.find((p) => p.slug === slug);
+    const param = searchParams.get('product');
+    if (!param || products.length === 0) return;
+    const match = products.find((p) => p._id === param || p.slug === param);
     if (match) setSelectedProduct(match);
   }, [searchParams, products]);
 

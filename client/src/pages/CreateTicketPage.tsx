@@ -283,7 +283,6 @@ export default function CreateTicketPage() {
         productDescription: selectedProduct?.description ?? undefined,
         productPrice:       selectedProduct?.price ?? undefined,
         productImageUrl:    selectedProduct?.imageUrl ?? undefined,
-        productSlug:        selectedProduct?.slug ?? undefined,
         attachments,
         // priority intentionally omitted — will be set by AI triage (see ticket.controller.ts)
       };

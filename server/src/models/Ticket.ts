@@ -11,7 +11,6 @@ export interface IProductSnapshot {
   description?: string | null;
   price?: number | null;
   imageUrl?: string | null;
-  slug?: string | null;
 }
 
 export interface TicketDocument extends Omit<ITicket, 'assignedTo' | 'product'>, Document {
@@ -74,7 +73,6 @@ const ticketSchema = new Schema<TicketDocument>(
         description: { type: String, default: null },
         price:       { type: Number, default: null },
         imageUrl:    { type: String, default: null },
-        slug:        { type: String, default: null },
       }, { _id: false }),
       default: null,
     },

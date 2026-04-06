@@ -265,7 +265,7 @@ function ProductPicker({
           <li key={p._id}>
             <button
               onMouseDown={() => {
-                onAdd({ productId: p._id, name: p.name, imageUrl: null, slug: p.slug ?? null });
+                onAdd({ productId: p._id, name: p.name, imageUrl: null });
                 onClose();
               }}
               className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-zinc-800 transition"
@@ -442,9 +442,9 @@ function ProductPreview({ productRef, onClose }: { productRef: AgentMessageProdu
           {product?.description && (
             <p className="text-sm leading-relaxed text-zinc-400 line-clamp-3">{product.description}</p>
           )}
-          {productRef.slug && (
+          {productRef.productId && (
             <Link
-              to={`/products?product=${productRef.slug}`}
+              to={`/products?product=${productRef.productId}`}
               onClick={onClose}
               className="flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-xs font-semibold text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100"
             >

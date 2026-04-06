@@ -61,7 +61,6 @@ export interface AdminTicketProduct {
   name: string;
   category?: string;
   description?: string | null;
-  slug?: string | null;
   price?: number | null;
   imageUrl?: string | null;
 }
@@ -116,7 +115,6 @@ export interface AdminProduct {
   sku: string;
   description: string;
   imageUrl?: string | null;
-  slug?: string | null;
 }
 
 export type CustomerArchetype = 'early_adopter' | 'loyal_advocate' | 'price_sensitive' | 'casual_buyer' | 'frustrated_veteran';
@@ -247,7 +245,6 @@ export interface AgentMessageProductRef {
   productId: string;
   name:      string;
   imageUrl?: string | null;
-  slug?:     string | null;
 }
 
 export interface AgentMessage {
