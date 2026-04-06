@@ -68,36 +68,8 @@ export async function listAdminTickets(req: Request, res: Response): Promise<voi
     Ticket.countDocuments(filter),
   ]);
 
-  // Re-resolve R2-hosted product images only — getSignedUrl creates valid-looking URLs for
-  // ANY key regardless of existence, so we must not call it for external (imgur/CDN) slugs.
-  // The R2_PRODUCT_SLUGS set contains only the slugs we actually seeded into R2.
-  const R2_PRODUCT_SLUGS = new Set([
-    'plate-carrier-mk2', 'assault-pack-45l', 'cqb-belt-system', 'tac-gloves-pro',
-    'combat-knee-pad-set', 'comms-headset-adapter', 'admin-chest-rig', 'hydration-bladder-3l',
-  ]);
-  const r2Slugs = [...new Set(
-    tickets
-      .map(t => (t.product as Record<string, unknown> | null | undefined)?.slug as string | undefined)
-      .filter((s): s is string => Boolean(s) && R2_PRODUCT_SLUGS.has(s)),
-  )];
-  const imageUrlMap = new Map<string, string | null>();
-  await Promise.all(
-    r2Slugs.map(async (slug) => {
-      imageUrlMap.set(slug, await getObjectUrl(`products/${slug}.jpg`) ?? null);
-    }),
-  );
-  const enrichedTickets = tickets.map((t) => {
-    const snap = t.product as Record<string, unknown> | null | undefined;
-    if (!snap) return t;
-    const slug = snap.slug as string | null | undefined;
-    // Only override imageUrl when we have a confirmed R2 URL for this slug
-    const r2Url = slug ? imageUrlMap.get(slug) : undefined;
-    if (r2Url) return { ...t, product: { ...snap, imageUrl: r2Url } };
-    return t;
-  });
-
   res.json({
-    data: enrichedTickets,
+    data: tickets,
     meta: { total, page: pageNum, limit: limitNum, pages: Math.ceil(total / limitNum) },
   });
 }
@@ -112,10 +84,6 @@ export async function getAdminTicket(req: Request, res: Response): Promise<void>
   if (!ticket) { res.status(404).json({ error: 'Ticket not found' }); return; }
 
   const obj = await attachReadUrls(ticket.toObject());
-  const snap = obj.product as Record<string, unknown> | null | undefined;
-  if (snap?.slug) {
-    snap.imageUrl = await getObjectUrl(`products/${String(snap.slug)}.jpg`) ?? null;
-  }
   res.json({ data: obj });
 }
 
@@ -410,16 +378,14 @@ export async function deleteAgent(req: Request, res: Response): Promise<void> {
 export async function listAdminProducts(_req: Request, res: Response): Promise<void> {
   const products = await Product.find({ isActive: true }).sort({ sortOrder: 1, name: 1 }).lean();
 
-  const data = await Promise.all(
-    products.map(async (p) => ({
-      _id:      String(p._id),
-      name:     p.name,
-      category: p.category,
-      sku:      p.sku,
-      description: p.description,
-      imageUrl: p.imageKey ? await getObjectUrl(p.imageKey) : null,
-    })),
-  );
+  const data = products.map((p) => ({
+    _id:         String(p._id),
+    name:        p.name,
+    category:    p.category,
+    sku:         p.sku,
+    description: p.description,
+    imageUrl:    null,
+  }));
 
   res.json({ data });
 }

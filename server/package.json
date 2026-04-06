@@ -10,8 +10,7 @@
     "seed": "npm run seed:agent",
     "seed:agent": "ts-node-dev --transpile-only src/scripts/seed-agent.ts",
     "seed:products": "ts-node-dev --transpile-only src/scripts/seed-products.ts",
-    "seed:product-images": "ts-node-dev --transpile-only src/scripts/seed-product-images.ts",
-    "seed:prices": "ts-node-dev --transpile-only src/scripts/seed-prices.ts",
+"seed:prices": "ts-node-dev --transpile-only src/scripts/seed-prices.ts",
     "backfill:ticket-products": "ts-node-dev --transpile-only src/scripts/backfill-ticket-products.ts"
   },
   "dependencies": {
