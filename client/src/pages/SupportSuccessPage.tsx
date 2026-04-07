@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 
@@ -11,6 +12,15 @@ export default function SupportSuccessPage() {
   const location = useLocation();
   const state = (location.state as SuccessState | null) ?? null;
   const { t } = useLanguage();
+  const [copied, setCopied] = useState(false);
+
+  function copyTicketId() {
+    if (!ticketId) return;
+    navigator.clipboard.writeText(ticketId).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
   const ts = t.success;
 
   return (
@@ -35,9 +45,29 @@ export default function SupportSuccessPage() {
             <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
               {ts.reference}
             </p>
-            <p className="mt-2 break-all font-mono text-sm text-zinc-200">
-              {ticketId ?? ts.pending}
-            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <p className="break-all font-mono text-sm text-zinc-200 flex-1">
+                {ticketId ?? ts.pending}
+              </p>
+              {ticketId && (
+                <button
+                  onClick={copyTicketId}
+                  title="Copy reference"
+                  className="shrink-0 rounded-md p-1 text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-300"
+                >
+                  {copied ? (
+                    <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5 text-green-400">
+                      <path d="M3 8l3.5 3.5L13 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 16 16" fill="none" className="h-3.5 w-3.5">
+                      <rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+                      <path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v7A1.5 1.5 0 003.5 12H5" stroke="currentColor" strokeWidth="1.3"/>
+                    </svg>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
