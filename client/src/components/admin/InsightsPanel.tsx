@@ -327,7 +327,7 @@ export default function InsightsPanel({ open, onClose }: Props) {
         <div className="flex shrink-0 items-center justify-between border-b border-zinc-800 px-6 py-4">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-violet-500">AI Intelligence</p>
-            <h2 className="text-sm font-bold text-zinc-100">Store Insights</h2>
+            <h2 className="text-sm font-bold text-zinc-100">Platform Insights</h2>
             {displayDate && (
               <p className="mt-0.5 text-[10px] text-zinc-600">
                 {tab === 'current' && cached ? 'Cached · ' : ''}

@@ -138,7 +138,7 @@ export async function sendMessage(req: Request, res: Response) {
       status:   r.status,
     })),
     productRefs: productRefs.map((r) => ({
-      productId: new Types.ObjectId(r.productId),
+      productId: r.productId,
       name:      r.name,
       imageUrl:  r.imageUrl ?? null,
     })),

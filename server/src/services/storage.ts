@@ -250,6 +250,52 @@ export async function createAvatarUpload(agentId: string, contentType: string) {
   return { uploadUrl, key, expiresIn: config.uploadUrlTtlSeconds };
 }
 
+export async function uploadTicketImageBuffer(input: {
+  buffer: Buffer;
+  fileName: string;
+  contentType: string;
+}): Promise<IAttachment> {
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(input.contentType)) {
+    throw new Error('Only GIF, JPG, PNG, and WEBP images are allowed');
+  }
+  if (input.buffer.length === 0 || input.buffer.length > MAX_TICKET_IMAGE_BYTES) {
+    throw new Error(`Images must be smaller than ${Math.round(MAX_TICKET_IMAGE_BYTES / (1024 * 1024))} MB`);
+  }
+  const config = getStorageConfig();
+  const key = [
+    'tickets', 'images',
+    new Date().toISOString().slice(0, 10),
+    `${crypto.randomUUID()}-${sanitizeBaseName(input.fileName)}${resolveExtension(input.fileName, input.contentType)}`,
+  ].join('/');
+  await getS3Client().send(new PutObjectCommand({
+    Bucket: config.bucket,
+    Key: key,
+    Body: input.buffer,
+    ContentType: input.contentType,
+  }));
+  return { key, fileName: input.fileName, mimeType: input.contentType, size: input.buffer.length };
+}
+
+export async function uploadAvatarBuffer(input: {
+  agentId: string;
+  buffer: Buffer;
+  contentType: string;
+}): Promise<string> {
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(input.contentType)) {
+    throw new Error('Only GIF, JPG, PNG, and WEBP images are allowed');
+  }
+  const ext = resolveExtension('avatar', input.contentType) || '.jpg';
+  const key = `avatars/${input.agentId}${ext}`;
+  const config = getStorageConfig();
+  await getS3Client().send(new PutObjectCommand({
+    Bucket: config.bucket,
+    Key: key,
+    Body: input.buffer,
+    ContentType: input.contentType,
+  }));
+  return key;
+}
+
 async function getAttachmentReadUrl(key: string): Promise<string> {
   const config = getStorageConfig();
 

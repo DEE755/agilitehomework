@@ -10,7 +10,7 @@ import { runAiAgentPipeline } from '../services/aiAgentService';
 import { generateStoreInsights, compareInsightsSnapshots, rateAgentWithAI } from '../services/aiService';
 import type { TicketStatus, TicketPriority } from '../types/ticket.types';
 import type { AgentRole } from '../types/auth.types';
-import { attachReadUrls, getObjectUrl, createAvatarUpload } from '../services/storage';
+import { attachReadUrls, getObjectUrl, createAvatarUpload, uploadAvatarBuffer } from '../services/storage';
 import { sendAgentWelcomeEmail, sendAgentReplyEmail, sendInsightsReportEmail } from '../services/emailService';
 import { Notification } from '../models/Notification';
 import { notifyAssigned } from '../services/notificationService';

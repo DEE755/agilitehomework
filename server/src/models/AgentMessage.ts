@@ -5,7 +5,7 @@ export interface IAgentMessage {
   toId:   Types.ObjectId;
   body:   string;
   ticketRefs:  { ticketId: Types.ObjectId; title: string; status: string }[];
-  productRefs: { productId: Types.ObjectId; name: string; imageUrl?: string | null }[];
+  productRefs: { productId: string; name: string; imageUrl?: string | null }[];
   readAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -29,7 +29,7 @@ const agentMessageSchema = new Schema<AgentMessageDocument>(
     productRefs: [
       {
         _id:       false,
-        productId: { type: Schema.Types.ObjectId, ref: 'Product' },
+        productId: { type: String },
         name:      String,
         imageUrl:  { type: String, default: null },
       },

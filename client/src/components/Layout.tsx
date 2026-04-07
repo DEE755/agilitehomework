@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Navbar from './Navbar';
 import { STOREFRONT_THEME_KEY, CUSTOMER_UI_THEME_KEY, applyTheme, getTheme } from '../themes/seasonal';
+import { useLanguage } from '../i18n/LanguageContext';
 
 function SeasonalBanner() {
   const [themeId, setThemeId] = useState<string>(() => localStorage.getItem(STOREFRONT_THEME_KEY) ?? 'default');
+  const { lang } = useLanguage();
 
   useEffect(() => {
     function onStorage(e: StorageEvent) {
@@ -17,13 +19,15 @@ function SeasonalBanner() {
   const theme = getTheme(themeId);
   if (!theme.banner || themeId === 'default') return null;
 
+  const bannerText = lang === 'he' && theme.banner.textHe ? theme.banner.textHe : theme.banner.text;
+
   return (
     <div
       className="seasonal-banner relative z-20 w-full py-3 text-center text-sm font-semibold tracking-wide text-white/95 shadow-lg transition-all duration-500"
       style={{ background: theme.banner.gradient }}
     >
       <span className="mr-2.5 text-base">{theme.emoji}</span>
-      {theme.banner.text}
+      {bannerText}
       <span className="ml-2.5 text-base">{theme.emoji}</span>
     </div>
   );

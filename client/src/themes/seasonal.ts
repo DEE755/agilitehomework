@@ -10,7 +10,7 @@ export interface SeasonalTheme {
   nameHe?: string;
   emoji: string;
   group: 'jewish' | 'commercial';
-  banner: { text: string; gradient: string } | null;
+  banner: { text: string; textHe?: string; gradient: string } | null;
   /** CSS custom property overrides applied to <html data-theme="id"> */
   vars: Record<string, string>;
   /** Optional ambient particle decorations rendered over the storefront */
@@ -37,6 +37,7 @@ export const THEMES: SeasonalTheme[] = [
     group: 'jewish',
     banner: {
       text: 'Hag Purim Sameach! Shop our festive collection.',
+      textHe: 'פורים שמח! גלו את הקולקציה החגיגית שלנו.',
       gradient: 'linear-gradient(90deg, rgba(91,33,182,0.95) 0%, rgba(126,34,206,0.9) 45%, rgba(219,39,119,0.85) 100%)',
     },
     decorations: {
@@ -68,6 +69,7 @@ export const THEMES: SeasonalTheme[] = [
     group: 'jewish',
     banner: {
       text: 'Hag Pesach Sameach! Fresh picks for the seder table.',
+      textHe: 'חג פסח שמח! בחירות טריות לשולחן הסדר.',
       gradient: 'linear-gradient(90deg, rgba(20,83,45,0.95) 0%, rgba(22,163,74,0.8) 55%, rgba(202,138,4,0.7) 100%)',
     },
     decorations: {
@@ -99,6 +101,7 @@ export const THEMES: SeasonalTheme[] = [
     group: 'jewish',
     banner: {
       text: "Happy Independence Day! יום העצמאות שמח",
+      textHe: 'יום העצמאות שמח! חוגגים עם הציוד הטוב ביותר.',
       gradient: 'linear-gradient(90deg, rgba(10,37,140,0.97) 0%, rgba(29,78,216,0.9) 50%, rgba(10,37,140,0.97) 100%)',
     },
     decorations: {
@@ -130,6 +133,7 @@ export const THEMES: SeasonalTheme[] = [
     group: 'jewish',
     banner: {
       text: 'Hag Shavuot Sameach! Light, fresh and celebratory.',
+      textHe: 'חג שבועות שמח! קל, טרי וחגיגי.',
       gradient: 'linear-gradient(90deg, rgba(13,78,55,0.92) 0%, rgba(20,184,166,0.75) 55%, rgba(5,150,105,0.85) 100%)',
     },
     vars: {
@@ -156,6 +160,7 @@ export const THEMES: SeasonalTheme[] = [
     group: 'jewish',
     banner: {
       text: 'Shana Tova! 🍎 Wishing you a sweet new year.',
+      textHe: 'שנה טובה! 🍎 מאחלים לכם שנה מתוקה.',
       gradient: 'linear-gradient(90deg, rgba(120,53,15,0.97) 0%, rgba(180,83,9,0.88) 50%, rgba(133,77,14,0.95) 100%)',
     },
     decorations: {
@@ -187,6 +192,7 @@ export const THEMES: SeasonalTheme[] = [
     group: 'jewish',
     banner: {
       text: 'Hag Sukkot Sameach! Harvest season warmth.',
+      textHe: 'חג סוכות שמח! חמימות עונת הקציר.',
       gradient: 'linear-gradient(90deg, rgba(124,45,18,0.97) 0%, rgba(194,65,12,0.88) 50%, rgba(161,98,7,0.85) 100%)',
     },
     vars: {
@@ -213,6 +219,7 @@ export const THEMES: SeasonalTheme[] = [
     group: 'jewish',
     banner: {
       text: 'Happy Hanukkah! חנוכה שמח — Shine bright this season.',
+      textHe: 'חנוכה שמח! זהרו בעונה הזו.',
       gradient: 'linear-gradient(90deg, rgba(7,31,133,0.97) 0%, rgba(29,78,216,0.88) 55%, rgba(180,83,9,0.65) 100%)',
     },
     decorations: {
@@ -244,6 +251,7 @@ export const THEMES: SeasonalTheme[] = [
     group: 'jewish',
     banner: {
       text: "Tu B'Av — Share love with something special.",
+      textHe: 'ט״ו באב — שתפו אהבה עם משהו מיוחד.',
       gradient: 'linear-gradient(90deg, rgba(136,19,55,0.97) 0%, rgba(190,24,93,0.88) 50%, rgba(157,23,77,0.9) 100%)',
     },
     decorations: {
@@ -276,6 +284,7 @@ export const THEMES: SeasonalTheme[] = [
     group: 'commercial',
     banner: {
       text: 'BLACK FRIDAY — Unmissable deals. Shop now.',
+      textHe: 'יום שישי השחור — מבצעים שאסור לפספס. קנו עכשיו.',
       gradient: 'linear-gradient(90deg, rgba(0,0,0,0.99) 0%, rgba(9,9,11,0.99) 50%, rgba(21,128,61,0.55) 100%)',
     },
     vars: {
@@ -301,6 +310,7 @@ export const THEMES: SeasonalTheme[] = [
     group: 'commercial',
     banner: {
       text: "Happy Valentine's Day! Give the gift of quality.",
+      textHe: 'יום האהבה שמח! תנו מתנה של איכות.',
       gradient: 'linear-gradient(90deg, rgba(136,19,55,0.97) 0%, rgba(190,18,60,0.88) 50%, rgba(159,18,57,0.9) 100%)',
     },
     decorations: {

@@ -555,12 +555,15 @@ function Compose({
 
   async function handleSend() {
     if (!body.trim() || sending) return;
+    const bodyToSend = body.trim();
+    const ticketsToSend = ticketRefs;
+    const productsToSend = productRefs;
+    setBody('');
+    setTicketRefs([]);
+    setProductRefs([]);
     setSending(true);
     try {
-      await onSend(body.trim(), ticketRefs, productRefs);
-      setBody('');
-      setTicketRefs([]);
-      setProductRefs([]);
+      await onSend(bodyToSend, ticketsToSend, productsToSend);
     } finally {
       setSending(false);
       textRef.current?.focus();
@@ -688,21 +691,37 @@ function ThreadView({
   myId,
   onSend,
   partnerOnline,
+  isAiAgent,
 }: {
   partner: { _id: string; name: string; avatarUrl?: string | null };
   myId: string;
   onSend: (body: string, ticketRefs: AgentMessageTicketRef[], productRefs: AgentMessageProductRef[]) => Promise<void>;
   partnerOnline?: boolean;
+  isAiAgent?: boolean;
 }) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [aiTyping, setAiTyping] = useState(false);
+  const aiTypingRef = useRef(false);
+  const aiTypingStartedRef = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function setAiTypingState(v: boolean) {
+    aiTypingRef.current = v;
+    setAiTyping(v);
+  }
 
   const loadMessages = useCallback(async () => {
     try {
       const res = await adminApi.messages.conversation(partner._id);
       setMessages(res.data.messages);
+      if (aiTypingRef.current) {
+        const hasReply = res.data.messages.some(
+          (m) => m.fromId === partner._id && new Date(m.createdAt).getTime() > aiTypingStartedRef.current,
+        );
+        if (hasReply) setAiTypingState(false);
+      }
     } catch {
       /* ignore */
     } finally {
@@ -713,6 +732,7 @@ function ThreadView({
   useEffect(() => {
     setLoading(true);
     setMessages([]);
+    setAiTypingState(false);
     loadMessages();
     intervalRef.current = setInterval(loadMessages, 5000);
     return () => {
@@ -722,7 +742,7 @@ function ThreadView({
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+  }, [messages.length, aiTyping]);
 
   async function handleSend(body: string, ticketRefs: AgentMessageTicketRef[], productRefs: AgentMessageProductRef[]) {
     // Optimistic update — show the message immediately without waiting for the server
@@ -739,6 +759,10 @@ function ThreadView({
     setMessages((prev) => [...prev, optimistic]);
     await onSend(body, ticketRefs, productRefs);
     await loadMessages(); // replaces optimistic message with server-confirmed one
+    if (isAiAgent) {
+      aiTypingStartedRef.current = Date.now();
+      setAiTypingState(true);
+    }
   }
 
   return (
@@ -794,6 +818,16 @@ function ThreadView({
         {messages.map((msg) => (
           <MessageBubble key={msg._id} msg={msg} isMine={msg.fromId === myId} />
         ))}
+        {aiTyping && (
+          <div className="flex items-end gap-2">
+            <Avatar name={partner.name} url={partner.avatarUrl} size="sm" />
+            <div className="rounded-2xl rounded-bl-sm bg-zinc-800 px-3 py-2.5 flex items-center gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-bounce [animation-delay:0ms]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-bounce [animation-delay:150ms]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-bounce [animation-delay:300ms]" />
+            </div>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -1080,6 +1114,7 @@ export default function MessagesPanel({ open, onClose, onUnreadChange, initialPa
                 myId={myId}
                 onSend={handleSend}
                 partnerOnline={isOnline(agents.find((a) => a._id === activePartner._id)?.lastActiveAt, agents.find((a) => a._id === activePartner._id)?.isAiAgent)}
+                isAiAgent={agents.find((a) => a._id === activePartner._id)?.isAiAgent}
               />
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center p-8">

@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { createTicketImageUpload } from '../services/storage';
+import { createTicketImageUpload, uploadTicketImageBuffer } from '../services/storage';
 
 // POST /api/uploads/ticket-images/presign
 export async function presignTicketImageUpload(req: Request, res: Response): Promise<void> {
@@ -38,5 +38,24 @@ export async function presignTicketImageUpload(req: Request, res: Response): Pro
         : 503;
 
     res.status(status).json({ error: message });
+  }
+}
+
+// POST /api/uploads/ticket-images  (proxy — browser sends file here, server puts to R2)
+export async function proxyTicketImageUpload(req: Request, res: Response): Promise<void> {
+  const rawName = req.headers['x-file-name'];
+  const fileName = typeof rawName === 'string' ? decodeURIComponent(rawName) : 'image';
+  const contentType = (typeof req.headers['content-type'] === 'string'
+    ? req.headers['content-type']
+    : ''
+  ).split(';')[0].trim();
+  const buffer = req.body instanceof Buffer ? req.body : Buffer.alloc(0);
+
+  try {
+    const attachment = await uploadTicketImageBuffer({ buffer, fileName, contentType });
+    res.status(201).json({ data: { attachment } });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Upload failed';
+    res.status(400).json({ error: message });
   }
 }
