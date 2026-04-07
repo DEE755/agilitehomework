@@ -65,7 +65,7 @@ export const THEMES: SeasonalTheme[] = [
     id: 'pesach',
     name: 'Pesach',
     nameHe: 'פסח',
-    emoji: '🌿',
+    emoji: '🫓',
     group: 'jewish',
     banner: {
       text: 'Hag Pesach Sameach! Fresh picks for the seder table.',
@@ -73,8 +73,8 @@ export const THEMES: SeasonalTheme[] = [
       gradient: 'linear-gradient(90deg, rgba(20,83,45,0.95) 0%, rgba(22,163,74,0.8) 55%, rgba(202,138,4,0.7) 100%)',
     },
     decorations: {
-      emojis: ['🌿', '🌸', '🌱', '🍃', '🌾'],
-      count: 12,
+      emojis: ['🫓', '🥚', '🍗', '🌿', '🍷', '🪺', '🌾'],
+      count: 14,
       animation: 'fall-down',
     },
     vars: {

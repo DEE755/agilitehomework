@@ -991,13 +991,6 @@ function MarketingPanel({ ticket, onAppendToReply, onProfileChange }: MarketingP
                   </div>
                 </div>
 
-                {/* Recommended approach */}
-                {profile.recommendedApproach && (
-                  <div className="rounded-lg border border-rose-500/15 bg-rose-500/5 px-3 py-2">
-                    <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wider text-rose-400/60">Suggested Approach</p>
-                    <p className="text-[11px] leading-relaxed text-zinc-400">{profile.recommendedApproach}</p>
-                  </div>
-                )}
               </div>
             )}
           </div>
