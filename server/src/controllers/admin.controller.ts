@@ -46,8 +46,7 @@ export async function listAdminTickets(req: Request, res: Response): Promise<voi
   const { status, priority, assignedTo, tag, page = '1', limit = '20' } = req.query;
 
   const filter: Record<string, unknown> = {};
-  if (status === 'unresolved') filter.status = { $in: ['new', 'in_progress'] };
-  else if (status)             filter.status = status;
+  if (status)                  filter.status = status;
   if (priority)                filter.aiPriority = priority;
   if (tag)        filter.aiTags     = tag;        // matches any ticket whose aiTags array contains this value
   if (assignedTo === 'unassigned') filter.assignedTo = null;

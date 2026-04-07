@@ -46,7 +46,7 @@ function formatAge(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-type StatusFilter   = TicketStatus | 'all' | 'unresolved';
+type StatusFilter   = TicketStatus | 'all';
 type PriorityFilter = TicketPriority | 'all';
 
 export type SortKey =
@@ -215,7 +215,6 @@ function MktBadge({ ticket, sortBy }: { ticket: AdminTicketSummary; sortBy: Sort
 
 const STATUS_OPTS: { label: string; value: StatusFilter }[] = [
   { label: 'All',         value: 'all'         },
-  { label: 'Pending',     value: 'unresolved'  },
   { label: 'New',         value: 'new'         },
   { label: 'In Progress', value: 'in_progress' },
   { label: 'Resolved',    value: 'resolved'    },
@@ -223,7 +222,6 @@ const STATUS_OPTS: { label: string; value: StatusFilter }[] = [
 
 const STATUS_STYLE: Record<StatusFilter, { pill: string; text: string }> = {
   all:         { pill: 'bg-zinc-700/60',     text: 'text-zinc-200'   },
-  unresolved:  { pill: 'bg-amber-500/25',    text: 'text-amber-300'  },
   new:         { pill: 'bg-olive-500/25',    text: 'text-olive-400'  },
   in_progress: { pill: 'bg-sky-500/25',      text: 'text-sky-300'    },
   resolved:    { pill: 'bg-violet-500/25',   text: 'text-violet-300' },
@@ -329,7 +327,7 @@ export default function AdminDashboardPage() {
   const [loading, setLoading]   = useState(true);
   const [error,   setError]     = useState<string | null>(null);
 
-  const [status,     setStatus]     = useState<StatusFilter>('unresolved');
+  const [status,     setStatus]     = useState<StatusFilter>('all');
   const [priority,   setPriority]   = useState<PriorityFilter>('all');
   const [assignedTo, setAssignedTo] = useState<string>('');
   const [activeTag,  setActiveTag]  = useState<string>('');
@@ -462,7 +460,7 @@ export default function AdminDashboardPage() {
         <StatusPillSelector value={status} onChange={setStatus} />
 
         {/* Row 2: secondary filters — horizontal scroll on mobile */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={priority}
             onChange={(e) => {
