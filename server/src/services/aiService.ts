@@ -122,7 +122,16 @@ async function chatCompletionRaw(systemPrompt: string, userContent: string, time
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      const err = new Error(`AI gateway error ${res.status}: ${body.slice(0, 200)}`);
+      const lower = body.toLowerCase();
+      let message: string;
+      if (res.status === 429 || lower.includes('throttl') || lower.includes('rate limit')) {
+        message = 'AI service is temporarily busy, please try again in a moment';
+      } else if (lower.includes('unable to process') || lower.includes('content filter') || lower.includes('safety')) {
+        message = 'The AI was unable to process this request';
+      } else {
+        message = `AI gateway error ${res.status}`;
+      }
+      const err = new Error(message);
       (err as Error & { status?: number }).status = res.status;
       throw err;
     }
@@ -534,7 +543,6 @@ export async function generateRemarketingPitch(input: {
     input.productTitle ? `Customer's product: ${input.productTitle}` : null,
     `Customer message: ${input.message.slice(0, 600)}`,
     input.customerArchetype ? `Customer archetype: ${input.customerArchetype}` : null,
-    input.refundIntent    ? `Refund intent: ${input.refundIntent}` : null,
     input.sentiment       ? `Sentiment: ${input.sentiment}` : null,
     `\n${catalogSection}`,
     targetNote || null,
