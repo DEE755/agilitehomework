@@ -429,6 +429,11 @@ function ProductPreview({ productRef, onClose }: { productRef: AgentMessageProdu
         <div className="p-5 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <h3 className="font-semibold text-zinc-100">{name}</h3>
+            {product?.price != null && (
+              <span className="shrink-0 rounded-full border border-olive-500/30 bg-olive-500/10 px-3 py-1 text-sm font-bold text-olive-400">
+                ${product.price}
+              </span>
+            )}
           </div>
           {product?.description && (
             <p className="text-sm leading-relaxed text-zinc-400 line-clamp-3">{product.description}</p>

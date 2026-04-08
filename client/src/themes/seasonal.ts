@@ -360,4 +360,6 @@ export function applyTheme(id: string) {
     root.style.setProperty(key, val);
   }
   localStorage.setItem(STOREFRONT_THEME_KEY, id);
+  // StorageEvent only fires in other tabs — notify same-tab listeners too
+  window.dispatchEvent(new CustomEvent('storefront-theme-change', { detail: id }));
 }

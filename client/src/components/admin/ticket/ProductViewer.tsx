@@ -94,8 +94,8 @@ export function ProductViewerModal({ product, onClose }: { product: AdminTicketP
                 <div className="h-3 w-4/5 animate-pulse rounded bg-zinc-800" />
                 <div className="h-3 w-3/5 animate-pulse rounded bg-zinc-800" />
               </div>
-            ) : full?.description ? (
-              <p className="text-sm leading-relaxed text-zinc-400">{full.description}</p>
+            ) : display.description ? (
+              <p className="text-sm leading-relaxed text-zinc-400">{display.description}</p>
             ) : (
               <p className="text-xs italic text-zinc-700">No description available.</p>
             )}

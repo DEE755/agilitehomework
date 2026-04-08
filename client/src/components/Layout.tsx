@@ -12,8 +12,13 @@ function SeasonalBanner() {
     function onStorage(e: StorageEvent) {
       if (e.key === STOREFRONT_THEME_KEY) setThemeId(e.newValue ?? 'default');
     }
+    function onCustom(e: Event) { setThemeId((e as CustomEvent<string>).detail); }
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    window.addEventListener('storefront-theme-change', onCustom);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('storefront-theme-change', onCustom);
+    };
   }, []);
 
   const theme = getTheme(themeId);
@@ -40,8 +45,13 @@ function PageTintOverlay() {
     function onStorage(e: StorageEvent) {
       if (e.key === STOREFRONT_THEME_KEY) setThemeId(e.newValue ?? 'default');
     }
+    function onCustom(e: Event) { setThemeId((e as CustomEvent<string>).detail); }
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    window.addEventListener('storefront-theme-change', onCustom);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('storefront-theme-change', onCustom);
+    };
   }, []);
 
   if (themeId === 'default') return null;
@@ -60,8 +70,13 @@ function ThemeDecorations() {
     function onStorage(e: StorageEvent) {
       if (e.key === STOREFRONT_THEME_KEY) setThemeId(e.newValue ?? 'default');
     }
+    function onCustom(e: Event) { setThemeId((e as CustomEvent<string>).detail); }
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    window.addEventListener('storefront-theme-change', onCustom);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('storefront-theme-change', onCustom);
+    };
   }, []);
 
   const theme = getTheme(themeId);

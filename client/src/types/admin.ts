@@ -115,6 +115,7 @@ export interface AdminProduct {
   category: string;
   sku: string;
   description: string;
+  price?: number | null;
   imageUrl?: string | null;
 }
 
