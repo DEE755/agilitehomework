@@ -1,155 +1,146 @@
-# Agilate — Tactical Gear Support Platform
+# Build & Launch Guide — Agilate
 
-A full-stack customer support platform built for a tactical gear store. It includes a public-facing storefront, a ticket support system, and a rich admin workspace with AI-powered tools.
-
----
-
-## Features
-
-### Storefront
-- Product catalog with category filtering and search
-- Product detail pages with image gallery
-- AI-powered product finder chat widget
-- Seasonal themes with animated decorations (Pesach, Purim, Hanukkah, Black Friday, and more)
-- Hebrew / English language toggle
-- Dark / light mode
-
-### Support Tickets
-- Customers can submit tickets linked to a product
-- Image attachments (up to 5 per ticket, stored on Cloudflare R2)
-- Ticket lookup page — customers can track their ticket status and read replies
-- Email notification sent to the customer on ticket creation
-
-### Admin Workspace
-- **Ticket queue** — filter by status, priority, agent, and tag; sort by date, priority, product value, and marketing signals
-- **Ticket detail** — full reply thread, internal notes, status/priority management, agent assignment
-- **AI Triage** — automatic priority detection, summary, and tags on ticket creation
-- **AI Reply Suggestions** — suggest a reply with optional goal (apologize, upsell, close, etc.)
-- **Customer Profiling** — archetype detection, churn risk, refund intent, lifetime value signal
-- **AI Remarketing** — generate targeted product pitches based on customer profile
-- **AI Coach** — conversational assistant to help agents handle difficult tickets
-- **Agent Messaging** — internal chat between agents, with AI agent support and typing indicators
-- **Platform Insights** — AI-generated store-wide analysis with snapshot history and period comparison
-- **Agent Management** — create agents, invite by email, manage roles and avatars
-- **Settings** — seasonal theme management for the storefront and admin UI independently
+This guide covers everything needed to install, configure, and run the project locally from scratch.
 
 ---
 
-## Tech Stack
+## Prerequisites
 
-| Layer | Technology |
+| Tool | Version |
 |---|---|
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS |
-| Routing | React Router v6 |
-| Backend | Node.js, Express 4, TypeScript |
-| Database | MongoDB with Mongoose |
-| AI | AWS Bedrock via Pydantic AI Gateway |
-| Storage | Cloudflare R2 (S3-compatible) |
-| Email | Mailgun |
-| Auth | JWT (Bearer token) |
-| Deployment | Render |
+| Node.js | 18 or higher |
+| npm | bundled with Node |
+| MongoDB | Atlas cluster or local instance |
+| Cloudflare R2 | bucket + API keys |
+| Pydantic AI Gateway | account + API key (AI features only) |
+| Mailgun | domain + API key (email notifications only) |
 
 ---
 
-## Project Structure
+## 1. Install Dependencies
 
-```
-projectAgilite/
-├── client/                  # React frontend (Vite)
-│   └── src/
-│       ├── components/      # Shared and admin components
-│       │   └── admin/
-│       │       └── ticket/  # Ticket sub-components (bubbles, panels, modals)
-│       ├── pages/           # Route-level pages
-│       ├── services/        # API clients (api.ts, adminApi.ts)
-│       ├── themes/          # Seasonal theme definitions
-│       ├── types/           # TypeScript interfaces
-│       ├── utils/           # Shared utilities (formatting, etc.)
-│       └── i18n/            # Translations (EN / HE)
-│
-└── server/                  # Express backend
-    └── src/
-        ├── controllers/     # Route handlers
-        ├── middlewares/     # Auth, error handling
-        ├── models/          # Mongoose schemas
-        ├── routes/          # Express routers
-        ├── services/        # AI, email, storage logic
-        └── types/           # Shared TypeScript types
-```
-
----
-
-## Getting Started
-
-### Prerequisites
-- Node.js 18+
-- MongoDB instance (local or Atlas)
-- Cloudflare R2 bucket
-- Mailgun account
-- Pydantic AI Gateway access (for AI features)
-
-### Installation
+Run from the **project root**:
 
 ```bash
-# Install all dependencies
-npm install
-npm --prefix client install
-npm --prefix server install
+npm install                   # root (concurrently)
+npm --prefix server install   # Express backend
+npm --prefix client install   # React frontend
 ```
 
-### Environment Variables
+---
 
-Create `server/.env`:
+## 2. Environment Variables
+
+### Server — `server/.env`
+
+Copy the example and fill in your values:
+
+```bash
+cp server/.env.example server/.env
+```
 
 ```env
-# Server
-PORT=3001
-MONGODB_URI=mongodb://localhost:27017/agilate
-JWT_SECRET=your-secret-here
+PORT=5050
+MONGODB_URI=mongodb+srv://user:password@cluster.mongodb.net/?appName=MyApp
+JWT_SECRET=change_me_to_a_long_random_string
 
 # Cloudflare R2
-S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com/<bucket>
-S3_ACCESS_KEY_ID=your-key
-S3_SECRET_ACCESS_KEY=your-secret
-S3_PUBLIC_BASE_URL=https://your-public-r2-domain.com
+S3_ENDPOINT=https://<accountId>.r2.cloudflarestorage.com/<bucket>
+S3_REGION=auto
+S3_ACCESS_KEY_ID=your-access-key
+S3_SECRET_ACCESS_KEY=your-secret-key
+S3_PUBLIC_BASE_URL=https://pub-<hash>.r2.dev
 
-# Mailgun
-MAILGUN_API_KEY=your-key
+# Pydantic AI Gateway (required for all AI features)
+PYDANTIC_GATEWAY_BASE_URL=https://your-gateway-url
+PYDANTIC_GATEWAY_API_KEY=your-api-key
+PYDANTIC_ANTHROPIC_MODEL=claude-sonnet-4-6
+
+# Mailgun (required for ticket email notifications)
+MAILGUN_API_KEY=your-mailgun-key
 MAILGUN_DOMAIN=mail.yourdomain.com
-MAILGUN_FROM_EMAIL=support@yourdomain.com
+MAILGUN_FROM_EMAIL=Agilate Support <no-reply@yourdomain.com>
 
-# AI Gateway
-PYDANTIC_AI_GATEWAY_URL=https://your-gateway-url
-PYDANTIC_AI_GATEWAY_API_KEY=your-key
+# Optional: Pydantic Logfire tracing
+LOGFIRE_TOKEN=your-logfire-token
 ```
 
-Create `client/.env`:
-
-```env
-VITE_API_URL=http://localhost:3001/api
-```
-
-### Running Locally
+### Client — `client/.env`
 
 ```bash
-# Run both server and client together
-npm run dev
-
-# Or separately
-npm run dev:server
-npm run dev:client
+cp client/.env.example client/.env
 ```
 
-The client runs on `http://localhost:5173` and the server on `http://localhost:3001`.
+```env
+VITE_API_URL=http://localhost:5050/api
+```
+
+> Make sure `VITE_API_URL` port matches `PORT` in `server/.env`.
 
 ---
 
-## Key Concepts
+## 3. Seed the First Admin Agent
 
-**Seasonal Themes** — The storefront and admin UI both support seasonal themes. The active theme is stored in the database and can be changed from the admin settings panel. Each theme defines a color palette, banner gradient, and animated particle decorations.
+Before logging in for the first time, create the initial admin account:
 
-**AI Integration** — All AI features go through the Pydantic AI Gateway, which proxies requests to AWS Bedrock (Claude). Triage runs automatically when a ticket is created. All other AI features — reply suggestions, customer profiling, coach, insights — are triggered manually by the agent.
+```bash
+npm --prefix server run seed
+```
 
-**Image Storage** — Ticket attachments are uploaded via a server-side proxy to Cloudflare R2, avoiding CORS issues with direct browser uploads. Product images are served through a public base URL configured on the R2 bucket.
+This creates an admin with default credentials:
 
-**Agent Messaging** — Agents can chat with each other or with the AI agent. The AI agent auto-replies using the ticket and product context. A typing indicator appears while waiting for the AI response.
+| Field | Default |
+|---|---|
+| Email | `admin@agilate.com` |
+| Password | `Admin1234!` |
+| Name | `Admin` |
+
+Override defaults by setting these in `server/.env` before running:
+
+```env
+SEED_EMAIL=you@yourdomain.com
+SEED_PASSWORD=YourStrongPassword
+SEED_NAME=Your Name
+```
+
+---
+
+## 4. Run Locally
+
+### Both server and client together (recommended)
+
+```bash
+npm run dev
+```
+
+Output is color-coded: **yellow** = server, **cyan** = client.
+
+### Separately
+
+```bash
+npm run dev:server   # Express API on http://localhost:5050
+npm run dev:client   # Vite UI on http://localhost:5173
+```
+
+---
+
+## 5. Key URLs
+
+| URL | Description |
+|---|---|
+| `http://localhost:5173` | Storefront & customer-facing pages |
+| `http://localhost:5173/admin` | Admin workspace (requires login) |
+| `http://localhost:5050/api` | REST API base |
+
+---
+
+## 6. What Requires External Services
+
+| Feature | Required service |
+|---|---|
+| Ticket image attachments | Cloudflare R2 |
+| Product images | Cloudflare R2 |
+| Email on ticket creation | Mailgun |
+| All AI features (triage, coach, remarketing, insights…) | Pydantic AI Gateway |
+
+The app starts and is usable without these — missing config causes those specific features to fail gracefully.
