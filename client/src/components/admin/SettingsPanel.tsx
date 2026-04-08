@@ -266,10 +266,7 @@ export default function SettingsPanel({ open, onClose, initialSection }: Props) 
                 {getStoredAgent()?.role === 'admin' && (
                   <div className="flex items-start justify-between gap-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3.5">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-semibold text-zinc-200">Force recommendations</p>
-                        <span className="rounded-full border border-zinc-700 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-600">Admin</span>
-                      </div>
+                      <p className="text-xs font-semibold text-zinc-200">Force recommendations</p>
                       <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
                         Always generate a product recommendation regardless of customer sentiment. Overrides the AI's "not recommended" decision.
                       </p>

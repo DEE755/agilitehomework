@@ -56,7 +56,7 @@ interface BedrockMessage {
 }
 
 // Multi-turn raw chat — returns plain text, no JSON extraction
-async function chatRaw(
+async function chatRawOnce(
   systemPrompt: string,
   messages: BedrockMessage[],
   timeoutMs = 45_000,
@@ -73,7 +73,9 @@ async function chatRaw(
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(`AI gateway error ${res.status}: ${body.slice(0, 200)}`);
+      const err = new Error(`AI gateway error ${res.status}: ${body.slice(0, 200)}`) as Error & { status: number };
+      err.status = res.status;
+      throw err;
     }
     type BedrockResponse = { output: { message: { content: Array<{ text: string }> } } };
     const data = (await res.json()) as BedrockResponse;
@@ -83,6 +85,25 @@ async function chatRaw(
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function chatRaw(
+  systemPrompt: string,
+  messages: BedrockMessage[],
+  timeoutMs = 45_000,
+): Promise<string> {
+  let lastErr: Error = new Error('Unknown AI error');
+  for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+    try {
+      return await chatRawOnce(systemPrompt, messages, timeoutMs);
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+      const status = (err as Error & { status?: number }).status;
+      if (!status || !RETRYABLE_STATUSES.has(status)) throw lastErr;
+    }
+  }
+  throw lastErr;
 }
 
 // Safe JSON parse — returns null instead of throwing on bad input
@@ -151,18 +172,20 @@ async function chatCompletionRaw(systemPrompt: string, userContent: string, time
   }
 }
 
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 529]);
+const RETRY_DELAYS_MS    = [0, 2_000, 5_000, 10_000]; // 4 attempts: immediate, 2s, 5s, 10s
+
 // Retries on transient gateway errors (rate limits, 5xx) with exponential back-off
 async function chatCompletion(systemPrompt: string, userContent: string, timeoutMs = 30_000, modelOverride?: string): Promise<string> {
-  const RETRYABLE = new Set([429, 500, 502, 503, 529]);
   let lastErr: Error = new Error('Unknown AI error');
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, 1000 * attempt));
+  for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
     try {
       return await chatCompletionRaw(systemPrompt, userContent, timeoutMs, modelOverride);
     } catch (err) {
       lastErr = err instanceof Error ? err : new Error(String(err));
       const status = (err as Error & { status?: number }).status;
-      if (!status || !RETRYABLE.has(status)) throw lastErr; // non-retryable
+      if (!status || !RETRYABLE_STATUSES.has(status)) throw lastErr; // non-retryable
     }
   }
   throw lastErr;
@@ -532,16 +555,27 @@ export async function generateRemarketingPitch(input: {
   const p: Raw = safeParseJson(content) ?? {};
 
   const shouldPitch     = input.force || input.targetProductName ? true : p.shouldPitch === true;
-  const productName     = typeof p.productName     === 'string' ? p.productName.trim()     : (input.targetProductName ?? '');
+  const aiProductName   = typeof p.productName === 'string' ? p.productName.trim() : '';
   const matchReason     = typeof p.matchReason     === 'string' ? p.matchReason.trim()     : '';
   const appendedMessage = typeof p.appendedMessage === 'string' ? p.appendedMessage.trim() : '';
+
+  // Validate returned product name against catalog — reject hallucinations
+  const catalogNames = input.catalog.map((c) => c.name);
+  const exactMatch = catalogNames.find((n) => n.toLowerCase() === aiProductName.toLowerCase());
+  let resolvedName = exactMatch
+    ?? input.targetProductName  // manual mode: always valid
+    // fuzzy fallback: catalog entry whose name contains a word from the AI name
+    ?? catalogNames.find((n) => aiProductName.split(' ').some((w) => w.length > 3 && n.toLowerCase().includes(w.toLowerCase())))
+    // last resort: first catalog item
+    ?? catalogNames[0]
+    ?? '';
 
   return {
     shouldPitch,
     productId:      '',  // filled in by the controller after lookup by name
-    productName:      shouldPitch ? productName      : '',
-    matchReason:      shouldPitch ? matchReason      : '',
-    appendedMessage:  shouldPitch ? appendedMessage  : '',
+    productName:      shouldPitch ? resolvedName    : '',
+    matchReason:      shouldPitch ? matchReason     : '',
+    appendedMessage:  shouldPitch ? appendedMessage : '',
   };
 }
 
