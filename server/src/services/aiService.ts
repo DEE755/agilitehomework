@@ -85,7 +85,20 @@ async function chatRaw(
   }
 }
 
-async function chatCompletion(systemPrompt: string, userContent: string, timeoutMs = 30_000, modelOverride?: string): Promise<string> {
+// Safe JSON parse — returns null instead of throwing on bad input
+function safeParseJson(raw: string): Record<string, unknown> | null {
+  // Strip markdown code fences just in case they survived the regex
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  try {
+    const val = JSON.parse(cleaned);
+    if (val && typeof val === 'object' && !Array.isArray(val)) return val as Record<string, unknown>;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function chatCompletionRaw(systemPrompt: string, userContent: string, timeoutMs = 30_000, modelOverride?: string): Promise<string> {
   const { url, apiKey } = getAiConfig(modelOverride);
 
   const controller = new AbortController();
@@ -109,7 +122,9 @@ async function chatCompletion(systemPrompt: string, userContent: string, timeout
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(`AI gateway error ${res.status}: ${body.slice(0, 200)}`);
+      const err = new Error(`AI gateway error ${res.status}: ${body.slice(0, 200)}`);
+      (err as Error & { status?: number }).status = res.status;
+      throw err;
     }
 
     type BedrockResponse = {
@@ -125,6 +140,23 @@ async function chatCompletion(systemPrompt: string, userContent: string, timeout
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Retries on transient gateway errors (rate limits, 5xx) with exponential back-off
+async function chatCompletion(systemPrompt: string, userContent: string, timeoutMs = 30_000, modelOverride?: string): Promise<string> {
+  const RETRYABLE = new Set([429, 500, 502, 503, 529]);
+  let lastErr: Error = new Error('Unknown AI error');
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 1000 * attempt));
+    try {
+      return await chatCompletionRaw(systemPrompt, userContent, timeoutMs, modelOverride);
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+      const status = (err as Error & { status?: number }).status;
+      if (!status || !RETRYABLE.has(status)) throw lastErr; // non-retryable
+    }
+  }
+  throw lastErr;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +207,7 @@ export async function triageTicket(input: {
     tags?: unknown;
   };
 
-  const parsed = JSON.parse(content) as RawTriage;
+  const parsed: RawTriage = safeParseJson(content) ?? {};
 
   const priority =
     parsed.priority === 'low' || parsed.priority === 'medium' || parsed.priority === 'high' || parsed.priority === 'irrelevant'
@@ -252,7 +284,7 @@ export async function suggestReply(input: {
     suggestedReply?: unknown; autoReplyEligible?: unknown;
     confidence?: unknown; riskLevel?: unknown; reason?: unknown;
   };
-  const p = JSON.parse(content) as RawReply;
+  const p: RawReply = safeParseJson(content) ?? {};
 
   const priority =
     p.priority === 'low' || p.priority === 'medium' || p.priority === 'high' ? p.priority : 'medium';
@@ -317,7 +349,7 @@ export async function customerAsk(question: string, product?: { name: string; ca
     ? `Product: ${product.name}${product.category ? ` (${product.category})` : ''}\n\nQuestion: ${question}`
     : question;
   const content = await chatCompletion(CUSTOMER_ASK_PROMPT, context);
-  const p = JSON.parse(content) as { answer?: unknown; shouldEscalate?: unknown; suggestedTitle?: unknown; suggestedDescription?: unknown };
+  const p: { answer?: unknown; shouldEscalate?: unknown; suggestedTitle?: unknown; suggestedDescription?: unknown } = safeParseJson(content) ?? {};
   return {
     answer:               typeof p.answer               === 'string' ? p.answer               : '',
     shouldEscalate:       p.shouldEscalate !== false,
@@ -355,9 +387,11 @@ Archetype definitions:
 - frustrated_veteran: experienced customer who feels let down, entitled or demanding tone, past purchase references framed as disappointment
 
 Refund intent signals:
-- high: explicitly mentions refund/return/exchange, extreme frustration, product failed completely
+- high: explicitly demands a refund, return, or exchange; extreme frustration; product failed completely and customer wants money back
 - medium: dissatisfied, unhappy, exploring resolution options but not explicitly demanding a refund
 - low: issue-focused, cooperative tone, looking for a fix or information rather than money back
+
+Important: asking about warranty coverage, repair options, or support policies is NOT a refund intent signal — these are normal product inquiries and should be rated low unless the customer explicitly asks to return the product or get their money back.
 
 Churn risk:
 - high: ready to leave, compares negatively to competitors, says "last time" or "never again"
@@ -407,7 +441,7 @@ export async function analyzeCustomerProfile(input: {
     refundIntent?: unknown; refundIntentReason?: unknown; churnRisk?: unknown;
     sentiment?: unknown; lifetimeValueSignal?: unknown; recommendedApproach?: unknown;
   };
-  const p = JSON.parse(content) as Raw;
+  const p: Raw = safeParseJson(content) ?? {};
 
   const archetypes = ['early_adopter', 'loyal_advocate', 'price_sensitive', 'casual_buyer', 'frustrated_veteran'] as const;
   const risks      = ['low', 'medium', 'high'] as const;
@@ -514,7 +548,7 @@ export async function generateRemarketingPitch(input: {
     shouldPitch?: unknown; productId?: unknown; productName?: unknown;
     matchReason?: unknown; pitchLine?: unknown; appendedMessage?: unknown;
   };
-  const p = JSON.parse(content) as Raw;
+  const p: Raw = safeParseJson(content) ?? {};
 
   const productId   = typeof p.productId   === 'string' ? p.productId   : '';
   const productName = typeof p.productName === 'string' ? p.productName : '';
@@ -796,7 +830,7 @@ export async function productFinderChat(
     };
   };
 
-  const p = JSON.parse(match[0]) as RawFinder;
+  const p: RawFinder = safeParseJson(match[0]) ?? {} as RawFinder;
 
   const recommendations = Array.isArray(p.recommendations) ? (p.recommendations as unknown[]).map(String).filter(Boolean) : [];
   const rawPhase = (p.phase === 'recommending' || p.phase === 'following_up') ? p.phase : 'questioning';
@@ -902,7 +936,7 @@ Agents: ${input.humanAgentCount} human. AI assigned: ${input.aiAssignedCount}(${
       strengths?: unknown;
     };
   };
-  const p = JSON.parse(raw) as Raw;
+  const p: Raw = safeParseJson(raw) ?? {};
   const vp = p.vendorPerformance ?? {};
 
   return {
@@ -983,7 +1017,7 @@ Respond with valid JSON only.`;
     verdict?: unknown; healthScoreDelta?: unknown; summary?: unknown;
     improvements?: unknown; declines?: unknown; newRisks?: unknown; resolvedIssues?: unknown;
   };
-  const p = JSON.parse(raw) as Raw;
+  const p: Raw = safeParseJson(raw) ?? {};
   return {
     verdict:          (p.verdict === 'improving' || p.verdict === 'declining') ? p.verdict : 'stable',
     healthScoreDelta: typeof p.healthScoreDelta === 'number' ? p.healthScoreDelta : 0,
@@ -1051,7 +1085,7 @@ Respond with valid JSON only.`;
   );
 
   type Raw = { rating?: unknown; explanation?: unknown; strengths?: unknown; areasForImprovement?: unknown };
-  const p = JSON.parse(raw) as Raw;
+  const p: Raw = safeParseJson(raw) ?? {};
   return {
     rating:               typeof p.rating === 'number' ? Math.min(5, Math.max(1, Math.round(p.rating))) : 3,
     explanation:          typeof p.explanation === 'string' ? p.explanation : '',
