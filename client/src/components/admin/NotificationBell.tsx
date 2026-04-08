@@ -2,18 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../../services/adminApi';
 import type { AppNotification } from '../../types/admin';
+import { timeAgo } from '../../utils/formatting';
 
 const POLL_INTERVAL = 30_000; // 30 seconds
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 const TYPE_ICON: Record<AppNotification['type'], string> = {
   ticket_assigned:  '📋',

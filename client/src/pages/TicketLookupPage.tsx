@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
+import { productPalette as lookupPalette, formatDate } from '../utils/formatting';
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
 
@@ -24,22 +25,6 @@ interface LookupTicket {
   replies: LookupReply[];
 }
 
-const LOOKUP_PALETTES = [
-  { bg: 'bg-sky-500/20',     text: 'text-sky-300',     border: 'border-sky-500/30'     },
-  { bg: 'bg-violet-500/20',  text: 'text-violet-300',  border: 'border-violet-500/30'  },
-  { bg: 'bg-amber-500/20',   text: 'text-amber-300',   border: 'border-amber-500/30'   },
-  { bg: 'bg-rose-500/20',    text: 'text-rose-300',    border: 'border-rose-500/30'    },
-  { bg: 'bg-emerald-500/20', text: 'text-emerald-300', border: 'border-emerald-500/30' },
-  { bg: 'bg-cyan-500/20',    text: 'text-cyan-300',    border: 'border-cyan-500/30'    },
-  { bg: 'bg-orange-500/20',  text: 'text-orange-300',  border: 'border-orange-500/30'  },
-  { bg: 'bg-pink-500/20',    text: 'text-pink-300',    border: 'border-pink-500/30'    },
-];
-function lookupPalette(name: string) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
-  return LOOKUP_PALETTES[h % LOOKUP_PALETTES.length];
-}
-
 // STATUS_LABEL is built from translations inside the component
 
 const STATUS_CLS: Record<string, string> = {
@@ -47,12 +32,6 @@ const STATUS_CLS: Record<string, string> = {
   in_progress: 'border-sky-500/30 bg-sky-500/10 text-sky-400',
   resolved:    'border-zinc-700 bg-zinc-800 text-zinc-400',
 };
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
-}
 
 const inputCls =
   'w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:ring-1 focus:ring-[var(--th-border)] focus:border-[var(--th-border)]';

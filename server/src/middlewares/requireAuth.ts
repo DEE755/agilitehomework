@@ -26,7 +26,8 @@ export async function requireAuth(
 
   const token = auth.slice(7);
   try {
-    const secret = process.env.JWT_SECRET ?? 'dev-secret';
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET is not configured');
     const payload = jwt.verify(token, secret) as JwtPayload;
     const user = await User.findById(payload.userId).lean();
     if (!user) {

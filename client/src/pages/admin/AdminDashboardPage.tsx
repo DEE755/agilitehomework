@@ -1,26 +1,5 @@
 import { useEffect, useLayoutEffect, useState, useCallback, useRef } from 'react';
-
-const PRODUCT_PALETTES = [
-  { bg: 'bg-sky-500/20',     text: 'text-sky-300',     border: 'border-sky-500/30'     },
-  { bg: 'bg-violet-500/20',  text: 'text-violet-300',  border: 'border-violet-500/30'  },
-  { bg: 'bg-amber-500/20',   text: 'text-amber-300',   border: 'border-amber-500/30'   },
-  { bg: 'bg-rose-500/20',    text: 'text-rose-300',    border: 'border-rose-500/30'    },
-  { bg: 'bg-emerald-500/20', text: 'text-emerald-300', border: 'border-emerald-500/30' },
-  { bg: 'bg-cyan-500/20',    text: 'text-cyan-300',    border: 'border-cyan-500/30'    },
-  { bg: 'bg-orange-500/20',  text: 'text-orange-300',  border: 'border-orange-500/30'  },
-  { bg: 'bg-pink-500/20',    text: 'text-pink-300',    border: 'border-pink-500/30'    },
-];
-function parseTitle(raw: string): { productName: string | null; title: string } {
-  const m = raw.match(/^\[(.+?)\]\s*(.+)$/);
-  if (m) return { productName: m[1], title: m[2] };
-  return { productName: null, title: raw };
-}
-
-function productPalette(name: string) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
-  return PRODUCT_PALETTES[h % PRODUCT_PALETTES.length];
-}
+import { productPalette, parseTitle, formatAge } from '../../utils/formatting';
 import { Link } from 'react-router-dom';
 import { adminApi, getStoredAgent } from '../../services/adminApi';
 import type { AdminTicketSummary, AdminStats, Agent } from '../../types/admin';
@@ -36,14 +15,6 @@ function StatCard({ label, value, color }: { label: string; value: number; color
       <p className={`mt-1 text-2xl font-bold ${color}`}>{value}</p>
     </div>
   );
-}
-
-function formatAge(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const h = Math.floor(diff / 3600000);
-  if (h < 1) return `${Math.floor(diff / 60000)}m ago`;
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
 }
 
 type StatusFilter   = TicketStatus | 'all';
@@ -505,7 +476,7 @@ export default function AdminDashboardPage() {
               <circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
               {!showMktCols && <line x1="3" y1="3" x2="17" y2="17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>}
             </svg>
-            <span className="hidden sm:inline">{showMktCols ? 'Hide intel' : 'Show intel'}</span>
+            <span className="hidden sm:inline">{showMktCols ? 'Hide insights' : 'Marketing insights'}</span>
           </button>
         </div>
       </div>

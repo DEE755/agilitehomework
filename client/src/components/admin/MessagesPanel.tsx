@@ -11,6 +11,7 @@ import type {
   AdminTicket,
   AdminTicketSummary,
 } from '../../types/admin';
+import { timeAgo } from '../../utils/formatting';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -29,16 +30,6 @@ function OnlineDot({ active }: { active: boolean }) {
       <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
     </span>
   );
-}
-
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function avatarInitials(name: string) {
