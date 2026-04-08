@@ -436,6 +436,7 @@ Your goal is to suggest ONE product to cross-sell or upsell to a customer based 
 You will receive: the customer's issue, their profile archetype, and a catalog of available products.
 
 Rules:
+- You MUST only recommend products that appear in the provided catalog. Never invent, hallucinate, or suggest products that are not explicitly listed. Use the exact productId and productName from the catalog.
 - Pick a product that is COMPLEMENTARY or RELATED to the issue/product in the ticket — never recommend the same product
 - Do NOT pitch to hostile customers or customers with HIGH refund intent — if you receive such a profile, still return a result but set pitchLine and appendedMessage to empty strings and set shouldPitch: false
 - Be genuine and helpful, never salesy or pushy
@@ -515,13 +516,20 @@ export async function generateRemarketingPitch(input: {
   };
   const p = JSON.parse(content) as Raw;
 
+  const productId   = typeof p.productId   === 'string' ? p.productId   : '';
+  const productName = typeof p.productName === 'string' ? p.productName : '';
+
+  // Reject hallucinated products — only allow IDs that exist in the provided catalog
+  const validIds = new Set(input.catalog.map((c) => c.id));
+  const isValidProduct = productId !== '' && validIds.has(productId);
+
   return {
-    shouldPitch:       p.shouldPitch !== false,
-    productId:         typeof p.productId    === 'string' ? p.productId    : '',
-    productName:       typeof p.productName  === 'string' ? p.productName  : '',
-    matchReason:       typeof p.matchReason  === 'string' ? p.matchReason  : '',
-    pitchLine:         typeof p.pitchLine    === 'string' ? p.pitchLine    : '',
-    appendedMessage:   typeof p.appendedMessage === 'string' ? p.appendedMessage : '',
+    shouldPitch:     p.shouldPitch !== false && isValidProduct,
+    productId,
+    productName,
+    matchReason:     typeof p.matchReason     === 'string' ? p.matchReason     : '',
+    pitchLine:       isValidProduct ? (typeof p.pitchLine       === 'string' ? p.pitchLine       : '') : '',
+    appendedMessage: isValidProduct ? (typeof p.appendedMessage === 'string' ? p.appendedMessage : '') : '',
   };
 }
 
