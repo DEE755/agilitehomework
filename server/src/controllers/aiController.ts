@@ -5,7 +5,6 @@ import type { CoachMessage, CoachContext, FinderMessage } from '../services/aiSe
 import { ProductFinderLead } from '../models/ProductFinderLead';
 import { Ticket } from '../models/Ticket';
 import { Product } from '../models/Product';
-import { getObjectUrl } from '../services/storage';
 import { getOrCreateSettings } from '../models/Setting';
 
 // POST /api/ai/triage-ticket
@@ -192,21 +191,38 @@ export async function remarketHandler(req: Request, res: Response): Promise<void
   }
 
   try {
-    const [products, appSettings] = await Promise.all([
-      Product.find({ isActive: true }).select('_id slug name category description imageKey').lean(),
+    // Use the same external catalog as the storefront and admin products panel
+    const EXTERNAL_CATALOG = 'https://api.escuelajs.co/api/v1/products?limit=20';
+    const CAT_NAMES: Record<number, string> = { 1: 'Clothes', 2: 'Electronics', 3: 'Furniture', 4: 'Shoes', 5: 'Miscellaneous' };
+    const stripHtml = (s: string) => s.replace(/<[^>]*>/g, '').trim();
+
+    type ExtP = { id: number; title: string; price: number; description: string; category: { id: number }; images: string[] };
+
+    const [catalogRes, appSettings] = await Promise.all([
+      fetch(EXTERNAL_CATALOG),
       getOrCreateSettings(),
     ]);
+    if (!catalogRes.ok) throw new Error('Product catalog unavailable');
 
-    const catalog = products.map((p) => ({
-      name:        p.name,
-      category:    p.category,
-      description: p.description,
+    const rawProducts = (await catalogRes.json()) as ExtP[];
+    const extProducts = rawProducts
+      .map((p) => ({
+        id:          String(p.id),
+        name:        stripHtml(p.title ?? ''),
+        category:    CAT_NAMES[p.category?.id] ?? 'Miscellaneous',
+        description: stripHtml(p.description ?? ''),
+        imageUrl:    p.images?.[0] ?? null,
+      }))
+      .filter((p) => p.name);
+
+    const catalog = extProducts.map((p) => ({
+      name: p.name, category: p.category, description: p.description,
     }));
 
-    // Manual mode: resolve real MongoDB ID → product name
+    // Manual mode: find product by its external ID
     let targetProductName: string | undefined;
     if (typeof targetProductId === 'string' && targetProductId) {
-      const found = products.find((p) => String(p._id) === targetProductId);
+      const found = extProducts.find((p) => p.id === targetProductId);
       targetProductName = found?.name;
     }
 
@@ -221,18 +237,14 @@ export async function remarketHandler(req: Request, res: Response): Promise<void
       force: appSettings.forceRecommendations,
     });
 
-    // Find the product by name (case-insensitive) to get image + slug
+    // Find the picked product for its image URL
     const pickedProduct = result.productName
-      ? products.find((p) => p.name.toLowerCase() === result.productName.toLowerCase())
+      ? extProducts.find((p) => p.name.toLowerCase() === result.productName.toLowerCase())
       : null;
-    const productId   = pickedProduct ? String(pickedProduct._id) : '';
-    let imageUrl: string | null = null;
-    if (pickedProduct?.imageKey) {
-      imageUrl = await getObjectUrl(pickedProduct.imageKey) ?? null;
-    }
-    const productSlug: string | null = pickedProduct?.slug ?? null;
+    const productId  = pickedProduct?.id ?? '';
+    const imageUrl   = pickedProduct?.imageUrl ?? null;
 
-    res.json({ data: { ...result, productId, imageUrl, productSlug } });
+    res.json({ data: { ...result, productId, imageUrl, productSlug: null } });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Remarketing generation failed';
     const status = msg.includes('not configured') ? 503 : 502;

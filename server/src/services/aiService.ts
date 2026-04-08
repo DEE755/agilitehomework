@@ -498,17 +498,19 @@ export async function analyzeCustomerProfile(input: {
 
 const REMARKET_SYSTEM_PROMPT = `You are a product recommender for a retail store.
 
+CRITICAL RULE: You MUST set productName to a name copied EXACTLY from the catalog provided below. Do NOT invent, imagine, or use any product name that is not in the catalog. If you use a name not in the catalog it is an error.
+
 Read the customer's message and decide:
 - If the customer seems upset, frustrated, or hostile → set shouldPitch to false
 - Otherwise → set shouldPitch to true and recommend the most relevant product from the catalog
 
 Pick a product COMPLEMENTARY to the customer's situation — not the same product they already have.
-Use the exact product name from the catalog. Be warm and helpful, never pushy.
+Be warm and helpful, never pushy.
 
 Return ONLY valid JSON (no markdown, no code fences):
 {
   "shouldPitch": true,
-  "productName": "Exact product name from catalog",
+  "productName": "MUST be an exact name from the catalog",
   "matchReason": "One sentence: why this product fits this customer",
   "appendedMessage": "2-3 warm sentences to softly add after the support reply"
 }
@@ -534,18 +536,18 @@ export async function generateRemarketingPitch(input: {
   force?: boolean;
 }): Promise<RemarketingPitchResult> {
   const catalogSection = input.targetProductName
-    ? `Product to pitch (selected by agent): ${input.targetProductName}`
-    : `Available products:\n${input.catalog.map((p) => `- ${p.name} (${p.category}): ${p.description.slice(0, 120)}`).join('\n')}`;
+    ? `PRODUCT TO PITCH (selected by agent — use this exact name): ${input.targetProductName}`
+    : `AVAILABLE PRODUCTS — choose ONLY from this list:\n${input.catalog.map((p) => `- "${p.name}" (${p.category}): ${p.description.slice(0, 100)}`).join('\n')}`;
 
   const context = [
-    `Ticket subject: ${input.subject}`,
+    catalogSection,
+    `\nTicket subject: ${input.subject}`,
     input.productTitle      ? `Customer's current product: ${input.productTitle}` : null,
     `Customer message: ${input.message.slice(0, 600)}`,
     input.customerArchetype ? `Customer archetype: ${input.customerArchetype}`    : null,
     input.sentiment         ? `Sentiment: ${input.sentiment}`                     : null,
-    `\n${catalogSection}`,
     input.targetProductName
-      ? `\nThe agent selected the product above — set shouldPitch to true and pitch only that product.`
+      ? `\nSet shouldPitch to true and pitch only the product listed above.`
       : null,
   ].filter(Boolean).join('\n');
 
@@ -562,20 +564,27 @@ export async function generateRemarketingPitch(input: {
   // Validate returned product name against catalog — reject hallucinations
   const catalogNames = input.catalog.map((c) => c.name);
   const exactMatch = catalogNames.find((n) => n.toLowerCase() === aiProductName.toLowerCase());
-  let resolvedName = exactMatch
-    ?? input.targetProductName  // manual mode: always valid
-    // fuzzy fallback: catalog entry whose name contains a word from the AI name
+  const resolvedName = exactMatch
+    ?? input.targetProductName
     ?? catalogNames.find((n) => aiProductName.split(' ').some((w) => w.length > 3 && n.toLowerCase().includes(w.toLowerCase())))
-    // last resort: first catalog item
     ?? catalogNames[0]
     ?? '';
+
+  // If AI hallucinated, its matchReason and appendedMessage are about the wrong product — replace them
+  const hallucinated = resolvedName && resolvedName.toLowerCase() !== aiProductName.toLowerCase();
+  const finalMatchReason = hallucinated
+    ? `${resolvedName} could be a great complement to what you already have.`
+    : matchReason;
+  const finalAppendedMessage = hallucinated
+    ? `By the way, you might also be interested in our ${resolvedName} — it could pair nicely with your current setup. Feel free to check it out!`
+    : appendedMessage;
 
   return {
     shouldPitch,
     productId:      '',  // filled in by the controller after lookup by name
-    productName:      shouldPitch ? resolvedName    : '',
-    matchReason:      shouldPitch ? matchReason     : '',
-    appendedMessage:  shouldPitch ? appendedMessage : '',
+    productName:      shouldPitch ? resolvedName          : '',
+    matchReason:      shouldPitch ? finalMatchReason      : '',
+    appendedMessage:  shouldPitch ? finalAppendedMessage  : '',
   };
 }
 
