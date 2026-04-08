@@ -196,7 +196,7 @@ export async function remarketHandler(req: Request, res: Response): Promise<void
     const CAT_NAMES: Record<number, string> = { 1: 'Clothes', 2: 'Electronics', 3: 'Furniture', 4: 'Shoes', 5: 'Miscellaneous' };
     const stripHtml = (s: string) => s.replace(/<[^>]*>/g, '').trim();
 
-    type ExtP = { id: number; title: string; price: number; description: string; category: { id: number }; images: string[] };
+    type ExtP = { id: number; title: string; slug: string; price: number; description: string; category: { id: number }; images: string[] };
 
     const [catalogRes, appSettings] = await Promise.all([
       fetch(EXTERNAL_CATALOG),
@@ -212,6 +212,7 @@ export async function remarketHandler(req: Request, res: Response): Promise<void
         category:    CAT_NAMES[p.category?.id] ?? 'Miscellaneous',
         description: stripHtml(p.description ?? ''),
         imageUrl:    p.images?.[0] ?? null,
+        slug:        p.slug ?? null,
       }))
       .filter((p) => p.name);
 
@@ -241,10 +242,11 @@ export async function remarketHandler(req: Request, res: Response): Promise<void
     const pickedProduct = result.productName
       ? extProducts.find((p) => p.name.toLowerCase() === result.productName.toLowerCase())
       : null;
-    const productId  = pickedProduct?.id ?? '';
-    const imageUrl   = pickedProduct?.imageUrl ?? null;
+    const productId   = pickedProduct?.id ?? '';
+    const imageUrl    = pickedProduct?.imageUrl ?? null;
+    const productSlug = pickedProduct?.slug ?? null;
 
-    res.json({ data: { ...result, productId, imageUrl, productSlug: null } });
+    res.json({ data: { ...result, productId, imageUrl, productSlug } });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Remarketing generation failed';
     const status = msg.includes('not configured') ? 503 : 502;

@@ -281,9 +281,15 @@ export default function MarketingPanel({ ticket, onAppendToReply, onProfileChang
                         <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-600">Message Add-on Preview</p>
                         <p className="text-[11px] leading-relaxed text-zinc-400 whitespace-pre-wrap">{pitch.appendedMessage}</p>
                         {pitch.productSlug && (
-                          <p className="mt-2 text-[10px] text-zinc-500 italic">
-                            + View product: …/products?product={pitch.productSlug}
-                          </p>
+                          <a
+                            href={`/products?product=${pitch.productSlug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex items-center gap-1 text-[10px] text-olive-400 hover:text-olive-300 hover:underline"
+                          >
+                            <svg viewBox="0 0 12 12" fill="none" className="h-3 w-3 shrink-0"><path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V7M8 1h3m0 0v3m0-3L5 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            View product page
+                          </a>
                         )}
                       </div>
                     )}
