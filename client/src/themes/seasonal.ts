@@ -68,7 +68,7 @@ export const THEMES: SeasonalTheme[] = [
     emoji: '🫓',
     group: 'jewish',
     banner: {
-      text: 'Hag Pesach Sameach! Fresh picks for the seder table.',
+      text: '🍷 🫓 ✡️  Hag Pesach Sameach!  ✡️ 🫓 🍷',
       textHe: 'חג פסח שמח! בחירות טריות לשולחן הסדר.',
       gradient: 'linear-gradient(90deg, rgba(120,77,4,0.97) 0%, rgba(202,138,4,0.88) 50%, rgba(133,77,14,0.85) 100%)',
     },

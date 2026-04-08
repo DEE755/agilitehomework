@@ -460,22 +460,43 @@ export default function AdminTicketDetailPage() {
                   disabled={suggesting}
                   className="flex items-center gap-1.5 rounded border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-400 transition hover:bg-violet-500/20 disabled:opacity-40"
                 >
-                  <span>{suggesting ? '⟳' : '✦'}</span>
-                  {suggesting ? 'Analysing…' : replyBody.trim() ? 'Improve my answer' : 'Suggest Reply'}
+                  {suggesting ? (
+                    <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25"/>
+                      <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" className="opacity-75"/>
+                    </svg>
+                  ) : (
+                    <span>✦</span>
+                  )}
+                  {suggesting ? 'Generating…' : replyBody.trim() ? 'Improve my answer' : 'Suggest Reply'}
                 </button>
               </div>
               <form onSubmit={(e) => void handleReply(e)}>
-                <textarea
-                  value={replyBody}
-                  onChange={(e) => setReplyBody(e.target.value)}
-                  rows={4}
-                  placeholder="Type your response to the customer…"
-                  className={textareaCls}
-                />
+                <div className="relative">
+                  <textarea
+                    value={replyBody}
+                    onChange={(e) => setReplyBody(e.target.value)}
+                    rows={4}
+                    placeholder="Type your response to the customer…"
+                    disabled={suggesting}
+                    className={`${textareaCls} transition-opacity duration-200 ${suggesting ? 'opacity-30' : 'opacity-100'}`}
+                  />
+                  {suggesting && (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-lg">
+                      <div className="flex items-center gap-2 rounded-full border border-violet-500/40 bg-zinc-950/90 px-3.5 py-2 shadow-lg backdrop-blur-sm">
+                        <svg className="h-3.5 w-3.5 animate-spin text-violet-400" viewBox="0 0 24 24" fill="none">
+                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25"/>
+                          <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" className="opacity-75"/>
+                        </svg>
+                        <span className="text-[11px] font-semibold text-violet-300">AI is crafting your reply…</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <div className="mt-3 flex justify-end">
                   <button
                     type="submit"
-                    disabled={sendingReply || !replyBody.trim()}
+                    disabled={sendingReply || !replyBody.trim() || suggesting}
                     className="rounded border border-olive-500/40 bg-olive-500/15 px-5 py-2 text-xs font-semibold uppercase tracking-wider text-olive-400 transition hover:bg-olive-500/25 disabled:opacity-40"
                   >
                     {sendingReply ? 'Sending…' : 'Send Reply'}
