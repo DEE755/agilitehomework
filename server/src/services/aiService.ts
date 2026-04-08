@@ -481,13 +481,13 @@ You will receive: the customer's issue, their profile archetype, and a catalog o
 Rules:
 - You MUST only recommend products that appear in the provided catalog. Never invent, hallucinate, or suggest products that are not explicitly listed. Use the exact productId and productName from the catalog.
 - Pick a product that is COMPLEMENTARY or RELATED to the issue/product in the ticket — never recommend the same product
-- Only set shouldPitch to false if the customer is clearly hostile OR has explicitly asked for a refund, return, or their money back. Asking about warranty, repairs, coverage, or product specs is NOT a reason to skip the pitch — these customers are engaged and receptive
 - Be genuine and helpful, never salesy or pushy
 - The appendedMessage is a soft add-on paragraph to append AFTER a support reply — keep it brief, warm, and natural (2-3 sentences max)
+- Always set shouldPitch to true — the decision of whether to pitch has already been made
 
 Return ONLY a JSON object:
 {
-  "shouldPitch": true | false,
+  "shouldPitch": true,
   "productId": "...",
   "productName": "...",
   "matchReason": "One sentence: why this product is a great fit for this customer's situation.",
@@ -565,13 +565,17 @@ export async function generateRemarketingPitch(input: {
   const validIds = new Set(input.catalog.map((c) => c.id));
   const isValidProduct = productId !== '' && validIds.has(productId);
 
+  // Server-side shouldPitch decision: only block if customer is hostile
+  const isHostile = input.sentiment === 'hostile';
+  const shouldPitch = isValidProduct && !isHostile;
+
   return {
-    shouldPitch:     p.shouldPitch !== false && isValidProduct,
+    shouldPitch,
     productId,
     productName,
     matchReason:     typeof p.matchReason     === 'string' ? p.matchReason     : '',
-    pitchLine:       isValidProduct ? (typeof p.pitchLine       === 'string' ? p.pitchLine       : '') : '',
-    appendedMessage: isValidProduct ? (typeof p.appendedMessage === 'string' ? p.appendedMessage : '') : '',
+    pitchLine:       shouldPitch ? (typeof p.pitchLine       === 'string' ? p.pitchLine       : '') : '',
+    appendedMessage: shouldPitch ? (typeof p.appendedMessage === 'string' ? p.appendedMessage : '') : '',
   };
 }
 
