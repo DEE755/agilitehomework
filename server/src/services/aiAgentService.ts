@@ -46,7 +46,6 @@ export async function runAiAgentPipeline(ticketId: string, force = false): Promi
           .lean();
 
         const catalog = products.map((p) => ({
-          id:          String(p._id),
           name:        p.name,
           category:    p.category,
           description: p.description,
@@ -57,13 +56,12 @@ export async function runAiAgentPipeline(ticketId: string, force = false): Promi
           message:           ticket.description,
           productTitle:      ticket.product ? products.find((p) => String(p._id) === String(ticket.product))?.name : undefined,
           customerArchetype: ticket.mktArchetype ?? undefined,
-          refundIntent:      ticket.mktRefundIntent ?? undefined,
           sentiment:         ticket.mktSentiment ?? undefined,
           catalog,
         });
 
         if (pitch.shouldPitch && pitch.appendedMessage) {
-          const pickedProduct = products.find((p) => String(p._id) === pitch.productId);
+          const pickedProduct = products.find((p) => p.name.toLowerCase() === pitch.productName.toLowerCase());
           const productLink = pickedProduct?.slug
             ? `\n\nView product: ${APP_URL}/products?product=${pickedProduct.slug}`
             : '';

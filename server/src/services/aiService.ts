@@ -473,44 +473,31 @@ export async function analyzeCustomerProfile(input: {
 // Remarketing Pitch Generator
 // ---------------------------------------------------------------------------
 
-const REMARKET_SYSTEM_PROMPT = `You are an expert product recommender for Agilate, a multi-category retail store selling clothing, electronics, furniture, shoes, and accessories.
-Your goal is to suggest ONE product to cross-sell or upsell to a customer based on their support ticket context and customer profile, and generate a warm, non-pushy pitch.
+const REMARKET_SYSTEM_PROMPT = `You are a product recommender for a retail store.
 
-You will receive: the customer's issue, their profile archetype, and a catalog of available products.
+Read the customer's message and decide:
+- If the customer seems upset, frustrated, or hostile → set shouldPitch to false
+- Otherwise → set shouldPitch to true and recommend the most relevant product from the catalog
 
-Rules:
-- You MUST only recommend products that appear in the provided catalog. Never invent, hallucinate, or suggest products that are not explicitly listed. Use the exact productId and productName from the catalog.
-- Pick a product that is COMPLEMENTARY or RELATED to the issue/product in the ticket — never recommend the same product
-- Be genuine and helpful, never salesy or pushy
-- The appendedMessage is a soft add-on paragraph to append AFTER a support reply — keep it brief, warm, and natural (2-3 sentences max)
-- Always set shouldPitch to true — the decision of whether to pitch has already been made
+Pick a product COMPLEMENTARY to the customer's situation — not the same product they already have.
+Use the exact product name from the catalog. Be warm and helpful, never pushy.
 
-Return ONLY a JSON object:
+Return ONLY valid JSON (no markdown, no code fences):
 {
   "shouldPitch": true,
-  "productId": "...",
-  "productName": "...",
-  "matchReason": "One sentence: why this product is a great fit for this customer's situation.",
-  "pitchLine": "One engaging sentence introducing the product. Friendly and authentic. Empty string if shouldPitch is false.",
-  "appendedMessage": "2-3 sentence add-on paragraph to softly append to the support reply. Empty string if shouldPitch is false."
+  "productName": "Exact product name from catalog",
+  "matchReason": "One sentence: why this product fits this customer",
+  "appendedMessage": "2-3 warm sentences to softly add after the support reply"
 }
 
-Respond with valid JSON only. No markdown, no code fences.`;
+If shouldPitch is false, use empty strings for the other fields.`;
 
 export interface RemarketingPitchResult {
   shouldPitch: boolean;
   productId: string;
   productName: string;
   matchReason: string;
-  pitchLine: string;
   appendedMessage: string;
-}
-
-export interface CatalogProduct {
-  id: string;
-  name: string;
-  category: string;
-  description: string;
 }
 
 export async function generateRemarketingPitch(input: {
@@ -518,64 +505,43 @@ export async function generateRemarketingPitch(input: {
   message: string;
   productTitle?: string;
   customerArchetype?: string;
-  refundIntent?: string;
   sentiment?: string;
-  catalog: CatalogProduct[];
-  targetProductId?: string;  // if provided, use this product; skip AI catalog selection
+  catalog: { name: string; category: string; description: string }[];
   targetProductName?: string;
+  force?: boolean;
 }): Promise<RemarketingPitchResult> {
-  let catalogSection: string;
-  let targetNote = '';
-
-  if (input.targetProductId && input.targetProductName) {
-    // Manual mode: only pitch for the specified product
-    const target = input.catalog.find((p) => p.id === input.targetProductId);
-    catalogSection = `Recommended product (manually selected by agent):\n- ID: ${input.targetProductId}\n  Name: ${input.targetProductName}\n  Category: ${target?.category ?? ''}\n  Description: ${target?.description ?? ''}`;
-    targetNote = `\nIMPORTANT: The agent has manually selected the product above. Generate the pitch for ONLY that product. Set productId to "${input.targetProductId}" and productName to "${input.targetProductName}".`;
-  } else {
-    catalogSection = `Available product catalog (choose the BEST fit):\n${
-      input.catalog.map((p) => `- ID: ${p.id}\n  Name: ${p.name}\n  Category: ${p.category}\n  Description: ${p.description.slice(0, 120)}`).join('\n')
-    }`;
-  }
+  const catalogSection = input.targetProductName
+    ? `Product to pitch (selected by agent): ${input.targetProductName}`
+    : `Available products:\n${input.catalog.map((p) => `- ${p.name} (${p.category}): ${p.description.slice(0, 120)}`).join('\n')}`;
 
   const context = [
     `Ticket subject: ${input.subject}`,
-    input.productTitle ? `Customer's product: ${input.productTitle}` : null,
+    input.productTitle      ? `Customer's current product: ${input.productTitle}` : null,
     `Customer message: ${input.message.slice(0, 600)}`,
-    input.customerArchetype ? `Customer archetype: ${input.customerArchetype}` : null,
-    input.sentiment       ? `Sentiment: ${input.sentiment}` : null,
+    input.customerArchetype ? `Customer archetype: ${input.customerArchetype}`    : null,
+    input.sentiment         ? `Sentiment: ${input.sentiment}`                     : null,
     `\n${catalogSection}`,
-    targetNote || null,
-  ]
-    .filter(Boolean)
-    .join('\n');
+    input.targetProductName
+      ? `\nThe agent selected the product above — set shouldPitch to true and pitch only that product.`
+      : null,
+  ].filter(Boolean).join('\n');
 
   const content = await chatCompletion(REMARKET_SYSTEM_PROMPT, context);
 
-  type Raw = {
-    shouldPitch?: unknown; productId?: unknown; productName?: unknown;
-    matchReason?: unknown; pitchLine?: unknown; appendedMessage?: unknown;
-  };
+  type Raw = { shouldPitch?: unknown; productName?: unknown; matchReason?: unknown; appendedMessage?: unknown };
   const p: Raw = safeParseJson(content) ?? {};
 
-  const productId   = typeof p.productId   === 'string' ? p.productId   : '';
-  const productName = typeof p.productName === 'string' ? p.productName : '';
-
-  // Reject hallucinated products — only allow IDs that exist in the provided catalog
-  const validIds = new Set(input.catalog.map((c) => c.id));
-  const isValidProduct = productId !== '' && validIds.has(productId);
-
-  // Server-side shouldPitch decision: only block if customer is hostile
-  const isHostile = input.sentiment === 'hostile';
-  const shouldPitch = isValidProduct && !isHostile;
+  const shouldPitch     = input.force || input.targetProductName ? true : p.shouldPitch === true;
+  const productName     = typeof p.productName     === 'string' ? p.productName.trim()     : (input.targetProductName ?? '');
+  const matchReason     = typeof p.matchReason     === 'string' ? p.matchReason.trim()     : '';
+  const appendedMessage = typeof p.appendedMessage === 'string' ? p.appendedMessage.trim() : '';
 
   return {
     shouldPitch,
-    productId,
-    productName,
-    matchReason:     typeof p.matchReason     === 'string' ? p.matchReason     : '',
-    pitchLine:       shouldPitch ? (typeof p.pitchLine       === 'string' ? p.pitchLine       : '') : '',
-    appendedMessage: shouldPitch ? (typeof p.appendedMessage === 'string' ? p.appendedMessage : '') : '',
+    productId:      '',  // filled in by the controller after lookup by name
+    productName:      shouldPitch ? productName      : '',
+    matchReason:      shouldPitch ? matchReason      : '',
+    appendedMessage:  shouldPitch ? appendedMessage  : '',
   };
 }
 

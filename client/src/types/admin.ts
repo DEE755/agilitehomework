@@ -104,8 +104,9 @@ export interface AdminStats {
 }
 
 export interface AppSettings {
-  autoReplyEnabled: boolean;
-  activeTheme: string | null;
+  autoReplyEnabled:     boolean;
+  forceRecommendations: boolean;
+  activeTheme:          string | null;
 }
 
 export interface AdminProduct {
@@ -137,7 +138,6 @@ export interface RemarketingPitchResult {
   productId: string;
   productName: string;
   matchReason: string;
-  pitchLine: string;
   appendedMessage: string;
   imageUrl?: string | null;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { adminApi } from '../../services/adminApi';
+import { adminApi, getStoredAgent } from '../../services/adminApi';
 import type { AppSettings } from '../../types/admin';
 import { THEMES, applyTheme as applySeasonalTheme, getTheme } from '../../themes/seasonal';
 
@@ -261,6 +261,32 @@ export default function SettingsPanel({ open, onClose, initialSection }: Props) 
                     disabled={saving || settings === null}
                   />
                 </div>
+
+                {/* Force recommendations — admin only */}
+                {getStoredAgent()?.role === 'admin' && (
+                  <div className="flex items-start justify-between gap-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3.5">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-semibold text-zinc-200">Force recommendations</p>
+                        <span className="rounded-full border border-zinc-700 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-zinc-600">Admin</span>
+                      </div>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+                        Always generate a product recommendation regardless of customer sentiment. Overrides the AI's "not recommended" decision.
+                      </p>
+                      {settings?.forceRecommendations && (
+                        <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-400">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                          Always on
+                        </p>
+                      )}
+                    </div>
+                    <Toggle
+                      checked={settings?.forceRecommendations ?? false}
+                      onChange={(v) => void toggle('forceRecommendations', v)}
+                      disabled={saving || settings === null}
+                    />
+                  </div>
+                )}
 
                 {/* AI Agent avatar */}
                 <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-3.5">

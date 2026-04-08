@@ -407,19 +407,30 @@ export async function listTags(req: Request, res: Response): Promise<void> {
 // GET /api/admin/settings
 export async function getSettings(req: Request, res: Response): Promise<void> {
   const settings = await getOrCreateSettings();
-  res.json({ data: { autoReplyEnabled: settings.autoReplyEnabled, activeTheme: settings.activeTheme ?? null } });
+  res.json({ data: {
+    autoReplyEnabled:     settings.autoReplyEnabled,
+    forceRecommendations: settings.forceRecommendations,
+    activeTheme:          settings.activeTheme ?? null,
+  }});
 }
 
 // PATCH /api/admin/settings
 export async function updateSettings(req: Request, res: Response): Promise<void> {
-  const { autoReplyEnabled, activeTheme } = req.body as { autoReplyEnabled?: boolean; activeTheme?: string | null };
+  const { autoReplyEnabled, forceRecommendations, activeTheme } = req.body as {
+    autoReplyEnabled?: boolean; forceRecommendations?: boolean; activeTheme?: string | null;
+  };
 
   const settings = await getOrCreateSettings();
-  if (typeof autoReplyEnabled === 'boolean') settings.autoReplyEnabled = autoReplyEnabled;
+  if (typeof autoReplyEnabled     === 'boolean') settings.autoReplyEnabled     = autoReplyEnabled;
+  if (typeof forceRecommendations === 'boolean') settings.forceRecommendations = forceRecommendations;
   if (activeTheme !== undefined) settings.activeTheme = activeTheme ?? null;
   await settings.save();
 
-  res.json({ data: { autoReplyEnabled: settings.autoReplyEnabled, activeTheme: settings.activeTheme ?? null } });
+  res.json({ data: {
+    autoReplyEnabled:     settings.autoReplyEnabled,
+    forceRecommendations: settings.forceRecommendations,
+    activeTheme:          settings.activeTheme ?? null,
+  }});
 }
 
 // GET /api/admin/notifications  — returns unread + recent 50 for the acting agent

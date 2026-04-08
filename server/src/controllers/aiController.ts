@@ -6,6 +6,7 @@ import { ProductFinderLead } from '../models/ProductFinderLead';
 import { Ticket } from '../models/Ticket';
 import { Product } from '../models/Product';
 import { getObjectUrl } from '../services/storage';
+import { getOrCreateSettings } from '../models/Setting';
 
 // POST /api/ai/triage-ticket
 export async function triageTicketHandler(req: Request, res: Response): Promise<void> {
@@ -177,9 +178,9 @@ export async function customerProfileHandler(req: Request, res: Response): Promi
 
 // POST /api/ai/remarket
 export async function remarketHandler(req: Request, res: Response): Promise<void> {
-  const { subject, message, productTitle, customerArchetype, refundIntent, sentiment, targetProductId } = req.body as {
+  const { subject, message, productTitle, customerArchetype, sentiment, targetProductId } = req.body as {
     subject?: unknown; message?: unknown; productTitle?: unknown;
-    customerArchetype?: unknown; refundIntent?: unknown; sentiment?: unknown;
+    customerArchetype?: unknown; sentiment?: unknown;
     targetProductId?: unknown;
   };
 
@@ -191,17 +192,18 @@ export async function remarketHandler(req: Request, res: Response): Promise<void
   }
 
   try {
-    // Fetch active products as catalog
-    const products = await Product.find({ isActive: true }).select('_id slug name category description imageKey').lean();
+    const [products, appSettings] = await Promise.all([
+      Product.find({ isActive: true }).select('_id slug name category description imageKey').lean(),
+      getOrCreateSettings(),
+    ]);
 
-    // Resolve image URLs for the response (only if targeting a specific product)
     const catalog = products.map((p) => ({
-      id:          String(p._id),
       name:        p.name,
       category:    p.category,
       description: p.description,
     }));
 
+    // Manual mode: resolve real MongoDB ID → product name
     let targetProductName: string | undefined;
     if (typeof targetProductId === 'string' && targetProductId) {
       const found = products.find((p) => String(p._id) === targetProductId);
@@ -211,24 +213,26 @@ export async function remarketHandler(req: Request, res: Response): Promise<void
     const result = await generateRemarketingPitch({
       subject:           subject.trim(),
       message:           message.trim(),
-      productTitle:      typeof productTitle      === 'string' ? productTitle.trim()      : undefined,
-      customerArchetype: typeof customerArchetype === 'string' ? customerArchetype        : undefined,
-      refundIntent:      typeof refundIntent      === 'string' ? refundIntent             : undefined,
-      sentiment:         typeof sentiment         === 'string' ? sentiment                : undefined,
+      productTitle:      typeof productTitle      === 'string' ? productTitle.trim() : undefined,
+      customerArchetype: typeof customerArchetype === 'string' ? customerArchetype   : undefined,
+      sentiment:         typeof sentiment         === 'string' ? sentiment           : undefined,
       catalog,
-      targetProductId:   typeof targetProductId === 'string' && targetProductId ? targetProductId : undefined,
       targetProductName,
+      force: appSettings.forceRecommendations,
     });
 
-    // Attach image URL + slug for the picked product
-    const pickedProduct = products.find((p) => String(p._id) === result.productId);
+    // Find the product by name (case-insensitive) to get image + slug
+    const pickedProduct = result.productName
+      ? products.find((p) => p.name.toLowerCase() === result.productName.toLowerCase())
+      : null;
+    const productId   = pickedProduct ? String(pickedProduct._id) : '';
     let imageUrl: string | null = null;
     if (pickedProduct?.imageKey) {
       imageUrl = await getObjectUrl(pickedProduct.imageKey) ?? null;
     }
     const productSlug: string | null = pickedProduct?.slug ?? null;
 
-    res.json({ data: { ...result, imageUrl, productSlug } });
+    res.json({ data: { ...result, productId, imageUrl, productSlug } });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Remarketing generation failed';
     const status = msg.includes('not configured') ? 503 : 502;

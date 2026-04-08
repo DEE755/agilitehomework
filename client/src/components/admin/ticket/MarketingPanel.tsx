@@ -80,7 +80,6 @@ export default function MarketingPanel({ ticket, onAppendToReply, onProfileChang
         message:           ticket.description,
         productTitle:      ticket.product?.name,
         customerArchetype: profile?.archetype,
-        refundIntent:      profile?.refundIntent,
         sentiment:         profile?.sentiment,
         targetProductId:   remarketMode === 'manual' && selectedProductId ? selectedProductId : undefined,
       });
