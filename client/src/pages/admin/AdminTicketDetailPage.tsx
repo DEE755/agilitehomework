@@ -356,26 +356,6 @@ export default function AdminTicketDetailPage() {
     }
   }
 
-  async function handleSendAiReply() {
-    if (!id || !suggestResult?.suggestedReply) return;
-    setSendingReply(true);
-    try {
-      const { data: replyData } = await adminApi.tickets.reply(id, suggestResult.suggestedReply);
-      setTicket((prev) => prev ? {
-        ...prev,
-        replies: [...prev.replies, replyData.reply],
-        assignedTo: replyData.assignedTo ?? prev.assignedTo,
-        status: replyData.status ?? prev.status,
-      } : prev);
-      setReplyBody('');
-      setSuggestResult(null);
-      toast('AI reply sent', 'success');
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Failed to send reply', 'error');
-    } finally {
-      setSendingReply(false);
-    }
-  }
 
   if (loading) return <TicketDetailSkeleton />;
 
@@ -492,23 +472,7 @@ export default function AdminTicketDetailPage() {
                   placeholder="Type your response to the customer…"
                   className={textareaCls}
                 />
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                  {suggestResult ? (
-                    suggestResult.autoReplyEligible ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleSendAiReply()}
-                        disabled={sendingReply}
-                        className="flex items-center gap-1.5 rounded border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-sky-400 transition hover:bg-sky-500/20 disabled:opacity-40"
-                      >
-                        ✦ Send AI Reply
-                      </button>
-                    ) : (
-                      <span className="flex items-center gap-1.5 rounded border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-amber-500">
-                        ⚠ Human review required
-                      </span>
-                    )
-                  ) : <span />}
+                <div className="mt-3 flex justify-end">
                   <button
                     type="submit"
                     disabled={sendingReply || !replyBody.trim()}
