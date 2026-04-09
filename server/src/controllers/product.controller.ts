@@ -3,14 +3,19 @@ import type { Request, Response } from 'express';
 const EXTERNAL_CATALOG = 'https://api.escuelajs.co/api/v1/products?limit=20';
 const EXTERNAL_PRODUCT = 'https://api.escuelajs.co/api/v1/products';
 
-// Canonical category names keyed by the Platzi API category ID
-const CATEGORY_NAMES: Record<number, string> = {
-  1: 'Clothes',
-  2: 'Electronics',
-  3: 'Furniture',
-  4: 'Shoes',
-  5: 'Miscellaneous',
+// Canonical category names — normalise slug/name from Platzi API
+const CATEGORY_SLUGS: Record<string, string> = {
+  clothes:       'Clothes',
+  electronics:   'Electronics',
+  furniture:     'Furniture',
+  shoes:         'Shoes',
+  miscellaneous: 'Miscellaneous',
 };
+
+function resolveCategory(cat: { id: number; name: string; slug?: string }): string {
+  const key = (cat.slug ?? cat.name ?? '').toLowerCase();
+  return CATEGORY_SLUGS[key] ?? cat.name ?? 'Miscellaneous';
+}
 
 interface ExternalProduct {
   id: number;
@@ -18,7 +23,7 @@ interface ExternalProduct {
   slug: string;
   price: number;
   description: string;
-  category: { id: number; name: string };
+  category: { id: number; name: string; slug?: string };
   images: string[];
 }
 
@@ -41,7 +46,7 @@ export async function listProducts(_req: Request, res: Response): Promise<void> 
       _id:         String(p.id),
       slug:        p.slug,
       name:        stripHtml(p.title ?? ''),
-      category:    CATEGORY_NAMES[p.category?.id] ?? 'Miscellaneous',
+      category:    resolveCategory(p.category),
       description: stripHtml(p.description ?? ''),
       sku:         `EXT-${p.id}`,
       price:       p.price ?? null,
@@ -67,7 +72,7 @@ export async function getProduct(req: Request, res: Response): Promise<void> {
       _id:         String(p.id),
       slug:        p.slug,
       name:        stripHtml(p.title ?? ''),
-      category:    CATEGORY_NAMES[p.category?.id] ?? 'Miscellaneous',
+      category:    resolveCategory(p.category),
       description: stripHtml(p.description ?? ''),
       sku:         `EXT-${p.id}`,
       price:       p.price ?? null,
