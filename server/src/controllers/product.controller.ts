@@ -4,7 +4,7 @@ import type { Request, Response } from 'express';
 const ESCUELA_URL = 'https://api.escuelajs.co/api/v1/products?limit=200';
 const ESCUELA_PRODUCT = 'https://api.escuelajs.co/api/v1/products';
 
-// Canonical display names for the 6 Escuela JS categories
+// Canonical display names for known Escuela JS categories
 const CATEGORY_MAP: Record<number, string> = {
   1: 'Vegetables',
   2: 'Fruit',
@@ -13,8 +13,6 @@ const CATEGORY_MAP: Record<number, string> = {
   5: 'Grains',
   6: 'Personal Care',
 };
-
-const ALLOWED_CATEGORY_IDS = new Set(Object.keys(CATEGORY_MAP).map(Number));
 
 interface EscuelaCategory {
   id: number;
@@ -61,7 +59,7 @@ export async function listProducts(_req: Request, res: Response): Promise<void> 
 
   const products = (await upstream.json()) as EscuelaProduct[];
   const data = products
-    .filter((p) => ALLOWED_CATEGORY_IDS.has(p.category?.id) && p.title && p.images?.length)
+    .filter((p) => p.title && p.images?.length)
     .map(toProduct);
 
   res.json({ data });
@@ -76,10 +74,5 @@ export async function getProduct(req: Request, res: Response): Promise<void> {
   }
 
   const p = (await upstream.json()) as EscuelaProduct;
-  if (!ALLOWED_CATEGORY_IDS.has(p.category?.id)) {
-    res.status(404).json({ error: 'Product not found' });
-    return;
-  }
-
   res.json({ data: toProduct(p) });
 }
